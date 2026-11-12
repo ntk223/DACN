@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1060" font-family="-apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="1060" fill="#ffffff"/>
+
+  <!-- ===== Title ===== -->
+  <text x="640" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Sandbox Kit Clone — Kiến trúc MCP Integration</text>
+  <text x="640" y="64" text-anchor="middle" font-size="13" fill="#64748b">MCP Gateway = giao diện thống nhất cho agent · file lớn offload cloud trong suốt · runtime pluggable (docker / k8s)</text>
+
+  <!-- ===== Band 1: AI Agent ===== -->
+  <rect x="340" y="90" width="600" height="120" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="640" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="#1d4ed8">AI AGENT</text>
+  <text x="640" y="142" text-anchor="middle" font-size="12.5" fill="#334155">Claude Code · Cursor · Custom MCP clients</text>
+  <text x="640" y="162" text-anchor="middle" font-size="11.5" fill="#334155">chỉ thấy một bộ tool MCP thống nhất (sandbox_* · command_* · file_* · git_* · workspace_*)</text>
+  <text x="640" y="182" text-anchor="middle" font-size="11.5" font-style="italic" fill="#64748b">hạ tầng phía sau hoàn toàn vô hình (Transparent Abstraction)</text>
+
+  <!-- Agent -> Gateway -->
+  <line x1="640" y1="210" x2="640" y2="250" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="652" y="228" font-size="11" fill="#475569">MCP Streamable HTTP</text>
+  <text x="628" y="228" text-anchor="end" font-size="11" fill="#475569">tools call</text>
+
+  <!-- ===== Band 2: MCP Gateway ===== -->
+  <rect x="340" y="250" width="600" height="130" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="640" y="278" text-anchor="middle" font-size="16" font-weight="700" fill="#6d28d9">MCP GATEWAY</text>
+  <text x="640" y="302" text-anchor="middle" font-size="12.5" fill="#334155">facade mỏng: 1 tool = 1 wrapper gọi REST Sandbox Manager/VFS</text>
+  <text x="640" y="322" text-anchor="middle" font-size="12" fill="#334155">MCP Streamable HTTP /mcp · stateless (scale ngang)</text>
+  <text x="640" y="342" text-anchor="middle" font-size="12" font-weight="600" fill="#6d28d9">body ≤ 4 MiB → file bytes KHÔNG bao giờ đi qua MCP</text>
+
+  <!-- ===== Band 3: services ===== -->
+  <!-- Sandbox Manager -->
+  <rect x="60" y="420" width="300" height="200" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="210" y="452" text-anchor="middle" font-size="15.5" font-weight="700" fill="#047857">SANDBOX MANAGER</text>
+  <text x="80" y="486" font-size="11.5" fill="#334155">· vòng đời sandbox (mgmt REST)</text>
+  <text x="80" y="506" font-size="11.5" fill="#334155">· thực thi lệnh qua gRPC exec agent</text>
+  <text x="80" y="526" font-size="11.5" fill="#334155">· delta sync_files trước mỗi lệnh</text>
+  <text x="80" y="546" font-size="11.5" fill="#334155">· session registry · auto-recovery</text>
+  <text x="210" y="592" text-anchor="middle" font-size="10.5" font-style="italic" fill="#047857">SANDBOX_PROVIDER: docker | k8s</text>
+
+  <!-- VFS -->
+  <rect x="430" y="420" width="300" height="200" rx="10" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="580" y="452" text-anchor="middle" font-size="15.5" font-weight="700" fill="#b45309">VFS SERVICE</text>
+  <text x="450" y="486" font-size="11.5" fill="#334155">· Single Source of Truth cây file</text>
+  <text x="450" y="506" font-size="11.5" fill="#334155">· file nhỏ → BLOB nội bộ</text>
+  <text x="450" y="526" font-size="11.5" fill="#334155">· file lớn → pointer {cloud_ref, sha256}</text>
+  <text x="450" y="546" font-size="11.5" fill="#334155">· fuzzy edit · revisions · git engine</text>
+  <text x="580" y="592" text-anchor="middle" font-size="10.5" font-style="italic" fill="#b45309">manifest {path, size, sha256}</text>
+
+  <!-- Cloud -->
+  <rect x="800" y="420" width="330" height="200" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+  <text x="965" y="452" text-anchor="middle" font-size="15.5" font-weight="700" fill="#334155">CLOUD STORAGE</text>
+  <text x="820" y="486" font-size="11.5" fill="#334155">· presigned PUT/GET (URL ~10 phút)</text>
+  <text x="820" y="506" font-size="11.5" fill="#334155">· multipart ≥ 100 MB (part 8–16 MB)</text>
+  <text x="820" y="526" font-size="11.5" fill="#334155">· key sinh server-side, prefix theo</text>
+  <text x="820" y="542" font-size="11.5" fill="#334155">  workspace · lifecycle dọn rác</text>
+  <text x="820" y="566" font-size="11.5" fill="#334155">· verify sha256 trước khi ghi pointer</text>
+
+  <!-- Gateway -> Sandbox Manager (elbow, label trên đoạn ngang) -->
+  <path d="M 460 380 V 400 H 215 V 420" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="240" y="394" font-size="11" fill="#475569">REST nội bộ</text>
+
+  <!-- Gateway -> VFS (thẳng đứng) -->
+  <line x1="600" y1="380" x2="600" y2="420" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="612" y="404" font-size="11" fill="#475569">REST</text>
+
+  <!-- Agent -> Cloud (presigned, dashed) -->
+  <path d="M 940 150 H 1065 V 414" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowGray)"/>
+  <text x="948" y="140" font-size="10.5" fill="#475569">presigned PUT/GET — bytes không qua MCP</text>
+
+  <!-- Sandbox Manager <-> VFS -->
+  <line x1="360" y1="470" x2="430" y2="470" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="395" y="452" text-anchor="middle" font-size="10" fill="#475569">manifest</text>
+  <text x="395" y="488" text-anchor="middle" font-size="10" fill="#475569">delta</text>
+
+  <!-- VFS <-> Cloud -->
+  <line x1="730" y1="470" x2="800" y2="470" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="765" y="452" text-anchor="middle" font-size="10" fill="#475569">pointer</text>
+  <text x="765" y="488" text-anchor="middle" font-size="10" fill="#475569">sha256</text>
+
+  <!-- ===== Band 4: Sandbox Runtime — 2 panel: (trái) runtime pluggable · (phải) bên trong sandbox ===== -->
+  <rect x="60" y="680" width="1070" height="314" rx="10" fill="#fcfcfd" stroke="#94a3b8" stroke-width="1.5"/>
+
+  <!-- Panel trái: RUNTIME PLUGGABLE -->
+  <rect x="80" y="706" width="560" height="276" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="620" y="728" text-anchor="end" font-size="13" font-weight="700" fill="#334155">RUNTIME PLUGGABLE — nơi sandbox chạy</text>
+
+  <rect x="100" y="742" width="520" height="70" rx="8" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="360" y="764" text-anchor="middle" font-size="13.5" font-weight="700" fill="#b91c1c">SandboxProvider (ABC)</text>
+  <text x="120" y="786" font-size="11" fill="#334155">create · terminate · prepare_workspace</text>
+  <text x="120" y="804" font-size="11" fill="#334155">get_dial_target · healthcheck · list · sync_files (fallback)</text>
+
+  <line x1="360" y1="812" x2="360" y2="828" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="372" y="824" font-size="10" fill="#475569">get_provider()</text>
+
+  <rect x="100" y="828" width="245" height="64" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="222" y="854" text-anchor="middle" font-size="14" font-weight="700" fill="#334155">docker</text>
+  <text x="222" y="876" text-anchor="middle" font-size="10.5" fill="#64748b">dev / CI · agent in-container</text>
+
+  <rect x="375" y="828" width="245" height="64" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="497" y="854" text-anchor="middle" font-size="14" font-weight="700" fill="#334155">kubernetes</text>
+  <text x="497" y="876" text-anchor="middle" font-size="10.5" fill="#64748b">prod · agent as sidecar</text>
+
+  <text x="100" y="948" font-size="10.5" font-weight="700" fill="#334155">isolation tier</text>
+  <rect x="190" y="930" width="70" height="28" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="1.2"/>
+  <text x="225" y="948" text-anchor="middle" font-size="10.5" fill="#334155">runc</text>
+  <rect x="270" y="930" width="75" height="28" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="1.2"/>
+  <text x="307" y="948" text-anchor="middle" font-size="10.5" fill="#334155">runsc</text>
+  <rect x="355" y="930" width="75" height="28" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="1.2"/>
+  <text x="392" y="948" text-anchor="middle" font-size="10.5" fill="#334155">kata</text>
+  <text x="445" y="948" font-size="9.5" font-style="italic" fill="#64748b">docker→--runtime · k8s→RuntimeClass</text>
+  <text x="100" y="974" font-size="10" font-style="italic" fill="#64748b">trust model: runc → agent PID 1 + mTLS bắt buộc · runsc/kata → mTLS tiêu chuẩn</text>
+
+  <!-- Panel phải: BÊN TRONG MỘT SANDBOX (anatomy) -->
+  <rect x="660" y="706" width="470" height="276" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="1110" y="728" text-anchor="end" font-size="13" font-weight="700" fill="#334155">BÊN TRONG MỘT SANDBOX</text>
+
+  <rect x="680" y="740" width="430" height="226" rx="8" fill="#fcfcfd" stroke="#64748b" stroke-width="1.5" stroke-dasharray="7 4"/>
+  <rect x="695" y="754" width="195" height="58" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.2"/>
+  <text x="792" y="772" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b45309">EXEC AGENT</text>
+  <text x="792" y="790" text-anchor="middle" font-size="9.5" fill="#334155">gRPC: Exec · SyncFiles</text>
+  <text x="792" y="804" text-anchor="middle" font-size="9.5" fill="#334155">Healthcheck · Metrics</text>
+
+  <rect x="900" y="754" width="195" height="58" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.2"/>
+  <text x="997" y="772" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d4ed8">USER PROCESS</text>
+  <text x="997" y="790" text-anchor="middle" font-size="9.5" fill="#334155">do command_run sinh ra,</text>
+  <text x="997" y="804" text-anchor="middle" font-size="9.5" fill="#334155">sống ngắn hạn</text>
+
+  <rect x="695" y="822" width="400" height="38" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="705" y="845" font-size="10.5" fill="#334155"><tspan font-weight="700">/workspace</tspan> — BỀN · volume/PVC mount · SSOT ở VFS</text>
+
+  <rect x="695" y="868" width="400" height="26" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="705" y="885" font-size="10.5" fill="#334155">/tmp · /scratch — ephemeral · mất khi sandbox chết</text>
+
+  <text x="695" y="916" font-size="10" fill="#475569">image golden: bash · git · python/node (+ agent đóng gói sẵn)</text>
+  <text x="695" y="934" font-size="10" fill="#475569">cpu · mem cứng · ttl auto-expire · egress→cloud · ingress nếu expose</text>
+  <text x="695" y="954" font-size="9.5" font-style="italic" fill="#94a3b8">ranh giới đứt nét = isolation tier (runc / runsc / kata)</text>
+
+  <!-- Sandbox Manager -> ABC (lifecycle, thẳng đứng) -->
+  <line x1="250" y1="620" x2="250" y2="742" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="162" y="668" font-size="10.5" fill="#475569">lifecycle (create/terminate)</text>
+
+  <!-- Sandbox Manager -> exec agent trong sandbox (gRPC elbow) -->
+  <path d="M 320 620 V 668 H 700 V 754" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="332" y="640" font-size="10.5" fill="#475569">gRPC: exec + sync_files</text>
+  <text x="332" y="656" font-size="10" fill="#64748b">(dial target từ provider)</text>
+
+  <!-- Cloud prefetch -> vào sandbox (dashed) -->
+  <line x1="880" y1="620" x2="880" y2="740" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowGray)"/>
+  <text x="892" y="660" font-size="10.5" fill="#475569">presigned GET — prefetch</text>
+
+  <!-- ===== Legend ===== -->
+  <line x1="60" y1="1028" x2="100" y2="1028" stroke="#475569" stroke-width="1.5"/>
+  <text x="108" y="1032" font-size="11" fill="#475569">luồng điều khiển / REST · MCP · gRPC</text>
+  <line x1="360" y1="1028" x2="400" y2="1028" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="408" y="1032" font-size="11" fill="#475569">luồng bytes (presigned URL)</text>
+  <text x="1130" y="1032" text-anchor="end" font-size="11" font-style="italic" fill="#64748b">Agent chỉ thấy bộ tool — không biết runtime nào phía sau</text>
+</svg>

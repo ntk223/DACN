@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="minimal-white">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sandbox Kit · Cô lập & Thực thi</title>
+<link rel="stylesheet" href="../../../../.agents/skills/html-ppt/assets/fonts.css">
+<link rel="stylesheet" href="../../../../.agents/skills/html-ppt/assets/base.css">
+<link rel="stylesheet" id="theme-link" href="../../../../.agents/skills/html-ppt/assets/themes/minimal-white.css">
+<link rel="stylesheet" href="../../../../.agents/skills/html-ppt/assets/animations/animations.css">
+<style>
+/* Font-size scale-up: audience-friendly */
+.slide{font-size:20px}
+.kicker{font-size:17px}
+.h2{font-size:46px}
+.h4{font-size:24px}
+.lede{font-size:24px}
+.pill{font-size:15px}
+.eyebrow{font-size:13.5px}
+.dim{color:var(--text-2)}
+
+/* Table style — from skill table.html, token-based */
+.t{width:100%;border-collapse:collapse;font-size:19px}
+.t th,.t td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+.t th{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);font-weight:600}
+.t td b{color:var(--text-1)}
+.t .hl-row td{background:var(--surface-2)}
+.t .ok{color:var(--good)}.t .warn{color:var(--bad)}
+
+/* Comparison — from skill comparison.html */
+.vs{display:grid;grid-template-columns:1fr 90px 1fr;gap:28px;align-items:stretch;margin-top:30px}
+.vs .side{padding:26px}
+.vs .mid{font-size:52px;font-weight:800;color:var(--text-3);display:flex;align-items:center;justify-content:center}
+.vs .bad-side{border-top:3px solid var(--bad)}
+.vs .good-side{border-top:3px solid var(--good)}
+.vs h3{font-size:25px}
+.vs ul{padding-left:20px;font-size:19px;line-height:1.8;color:var(--text-2)}
+.vs li::marker{color:var(--bad)}
+.vs .good-side li::marker{color:var(--good)}
+
+/* Dual-face overview */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px}
+.duo .face{padding:30px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow)}
+.duo .face h3{font-size:24px;margin:8px 0 10px}
+.duo .face .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;padding:4px 10px;border-radius:999px}
+.duo .face p{font-size:19px;line-height:1.75;color:var(--text-2)}
+.duo .lock{border-top:3px solid var(--accent)}
+.duo .key{border-top:3px solid var(--good)}
+.duo .glyph{font-size:36px}
+
+/* Arch diagram — from skill arch-diagram.html */
+.arch{margin-top:22px;display:grid;grid-template-rows:auto auto auto auto;gap:16px}
+.arch .tier{display:grid;grid-template-columns:150px 1fr;align-items:stretch;gap:20px}
+.arch .tname{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;background:var(--surface-2);border-radius:var(--radius);padding:14px;font-weight:600;font-size:14.5px;color:var(--text-2);text-transform:uppercase;letter-spacing:.1em;text-align:center}
+.arch .tname small{font-size:12.5px;font-weight:400;letter-spacing:.04em;text-transform:none;color:var(--text-3)}
+.arch .cells{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.arch .cell{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow)}
+.arch .cell .ic{font-size:22px}
+.arch .cell h4{font-size:17px;margin:5px 0 2px}
+.arch .cell p{font-size:15px;color:var(--text-3);margin:0;line-height:1.5}
+.arch .tier.hl .cell{border-top:3px solid var(--accent)}
+.arch .bridge{display:flex;align-items:center;justify-content:center;gap:14px;font-size:15.5px;color:var(--text-2)}
+.arch .bridge .pill{font-size:13.5px}
+
+/* Spectrum bar */
+.spectrum{margin-top:34px}
+.spec-bar{height:14px;border-radius:999px;background:linear-gradient(90deg,var(--good),var(--accent),var(--bad));opacity:.85}
+.spec-marks{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:22px}
+.spec-mark{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.spec-mark h4{font-size:19px}
+.spec-mark .tier{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);font-weight:700}
+.spec-mark p{font-size:17px;color:var(--text-2);line-height:1.6;margin-top:6px}
+</style>
+</head>
+<body data-themes="minimal-white,corporate-clean,academic-paper,soft-pastel,editorial-serif" data-theme-base="../../../../.agents/skills/html-ppt/assets/themes/">
+<div class="deck">
+
+  <!-- 1. COVER -->
+  <section class="slide" data-title="Cover">
+    <div class="deck-header"><span class="eyebrow">Sandbox Kit · Báo cáo kỹ thuật</span><span class="eyebrow">Isolation & Execution</span></div>
+    <div class="anim-stagger-list">
+      <p class="kicker">Kiến trúc AI Agent Sandbox</p>
+      <h1 class="h1 anim-fade-up" data-anim="fade-up">
+        Cơ chế <span class="gradient-text">Cô lập</span> &<br>
+        Cơ chế <span class="gradient-text">Thực thi</span>
+      </h1>
+      <p class="lede">Đóng lồng môi trường chạy code của Agent — và mở lối giao tiếp chính xác từ bên ngoài vào trong.</p>
+      <div class="row wrap mt-l">
+        <span class="pill pill-accent">Isolation</span>
+        <span class="pill">Execution</span>
+        <span class="pill">Namespaces · cgroups · Seccomp</span>
+        <span class="pill">gVisor · Firecracker</span>
+        <span class="pill">In-Container Daemon</span>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sinh viên thực hiện · 2026</span><span class="slide-number" data-current="1" data-total="13"></span></div>
+  </section>
+
+  <!-- 2. OVERVIEW: HAI MẶT CỦA BÀI TOÁN -->
+  <section class="slide" data-title="Hai mặt của bài toán">
+    <p class="kicker">Tổng quan</p>
+    <h2 class="h2">Hai mặt đối lập nhưng bổ trợ nhau của cùng một bài toán</h2>
+    <div class="duo anim-stagger-list" data-anim-target>
+      <div class="face lock">
+        <span class="tag" style="background:var(--surface-2);color:var(--text-2)">Phần 1 · Isolation</span>
+        <h3>🔒 Cô lập là "Đóng lồng"</h3>
+        <p>Khóa chặt tiến trình của Agent, <b>không cho nó phá hoại hay leo thang đặc quyền</b> ra máy chủ (Host) — kể cả khi code bị thao túng.</p>
+      </div>
+      <div class="face key">
+        <span class="tag" style="background:var(--surface-2);color:var(--text-2)">Phần 2 · Execution</span>
+        <h3>🔑 Thực thi là "Mở lối giao tiếp"</h3>
+        <p>Khi cái lồng đã khóa kín (thậm chí <b>cắt mạng</b>), bộ não của Agent ở ngoài vẫn điều khiển, truyền lệnh, giữ trạng thái và lấy kết quả ra <b>mượt mà, chính xác nhất</b>.</p>
+      </div>
+    </div>
+    <p class="dim mt-l" style="font-size:19px">Lồng càng kín → giao tiếp càng khó. Toàn bộ thiết kế bên dưới là lời giải của sự đánh đổi này.</p>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="2" data-total="13"></span></div>
+  </section>
+
+  <!-- 3. DIVIDER: PHẦN 1 -->
+  <section class="slide center tc" data-title="Phần 1">
+    <div style="max-width:820px;margin:0 auto">
+      <p class="kicker anim-fade-down" data-anim="fade-down">Phần 1 / 2</p>
+      <h1 class="h1 anim-rise-in" data-anim="rise-in" style="font-size:88px">Cơ chế <span class="gradient-text">Cô lập</span></h1>
+      <div class="divider-accent" style="margin:24px auto"></div>
+      <p class="lede" style="margin:0 auto">Isolation Architecture — ba lớp khóa ở cấp độ hệ điều hành và phổ công nghệ cô lập.</p>
+    </div>
+  </section>
+
+  <!-- 4. ĐẶT VẤN ĐỀ: TRUSTED VS UNTRUSTED -->
+  <section class="slide" data-title="Đặt vấn đề">
+    <p class="kicker">Phần 1 · Đặt vấn đề</p>
+    <h2 class="h2">Chạy code của AI Agent khác gì chạy Web App truyền thống?</h2>
+    <div class="vs">
+      <div class="card bad-side side anim-fade-left" data-anim="fade-left">
+        <h3>🤖 AI Agent Sandbox — <i>Untrusted & Unpredictable</i></h3>
+        <ul>
+          <li>Code và câu lệnh <b>do LLM tự sinh ra</b> hoặc bị thao túng qua <b>Prompt Injection</b></li>
+          <li>Có thể vô tình chạy lệnh hủy diệt: <code>rm -rf /</code>, vòng lặp vô tận, <b>Fork Bomb</b></li>
+          <li>Có thể cố tình khai thác lỗ hổng Kernel để <b>thoát ra ngoài máy chủ</b> (Container Escape)</li>
+        </ul>
+      </div>
+      <div class="mid">≠</div>
+      <div class="card good-side side anim-fade-right" data-anim="fade-right">
+        <h3>📦 Ứng dụng truyền thống — <i>Trusted Code</i></h3>
+        <ul>
+          <li>Code do lập trình viên nội bộ viết, <b>đã qua kiểm duyệt</b> trước khi đóng gói</li>
+          <li>Docker ở đây phục vụ mục tiêu <b>đóng gói môi trường</b> (Packaging)</li>
+          <li><b>Không</b> phải bài toán chống mã độc</li>
+        </ul>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="4" data-total="13"></span></div>
+  </section>
+
+  <!-- 5. BA TRỤ CỘT -->
+  <section class="slide" data-title="Ba trụ cột">
+    <p class="kicker">Phần 1 · OS-level Isolation</p>
+    <h2 class="h2">Ba trụ cột cô lập — mỗi Sandbox phải qua 3 lớp khóa</h2>
+    <div class="grid g3 mt-l anim-stagger-list" data-anim-target>
+      <div class="card">
+        <div style="font-size:36px">👁️</div>
+        <h4 class="mt-s">1 · Cô lập Không gian nhìn</h4>
+        <p class="dim"><b>Namespaces</b> — "bịt mắt" tiến trình bên trong bằng các không gian riêng biệt:</p>
+        <div class="row wrap mt-s" style="gap:6px">
+          <span class="pill">PID</span><span class="pill">NET</span><span class="pill">MNT</span><span class="pill">IPC</span><span class="pill">UTS</span><span class="pill">USER</span>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:36px">📊</div>
+        <h4 class="mt-s">2 · Cô lập Tài nguyên</h4>
+        <p class="dim"><b>cgroups v2</b> — "đóng khung" hạn mức phần cứng, chống tấn công DoS:</p>
+        <p class="dim" style="font-size:17px;margin-top:8px">
+          <code>memory.max</code> — trần RAM · <code>cpu.max</code> — chu kỳ CPU<br>
+          <code>pids.max</code> — chống Fork Bomb · <code>io.max</code> — tốc độ đọc/ghi ổ cứng
+        </p>
+      </div>
+      <div class="card">
+        <div style="font-size:36px">🛡️</div>
+        <h4 class="mt-s">3 · Cô lập Quyền hạn & Syscall</h4>
+        <p class="dim">Thu hẹp bề mặt tấn công xuống Kernel:</p>
+        <p class="dim" style="font-size:17px;margin-top:8px">
+          Tước quyền root (<b>Linux Capabilities</b>) · Khóa hệ thống file <b>Read-only RootFS</b> ·
+          Bộ lọc <b>Seccomp-BPF / AppArmor</b> chặn syscall nguy hiểm
+        </p>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="5" data-total="13"></span></div>
+  </section>
+
+  <!-- 6. BẢNG 3 TIER -->
+  <section class="slide" data-title="Phân tầng công nghệ">
+    <p class="kicker">Phần 1 · The Isolation Spectrum</p>
+    <h2 class="h2">Ba cấp độ công nghệ cô lập — ranh giới Kernel quyết định độ an toàn</h2>
+    <div class="card mt-l" style="padding:4px 12px">
+      <table class="t">
+        <thead>
+          <tr><th style="width:22%">Cấp độ</th><th style="width:19%">Công nghệ</th><th style="width:24%">Kiến trúc / Ranh giới Kernel</th><th style="width:17%">Ưu điểm</th><th>Hạn chế & Rủi ro</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Tier 1</b><br><span class="dim" style="font-size:14.5px">OS-level Virtualization</span></td>
+            <td>Docker (runc)<br><span class="dim" style="font-size:14.5px">+ hardening: seccomp, cap-drop</span></td>
+            <td>Dùng chung Linux Kernel <b>trực tiếp</b> với Host</td>
+            <td class="ok">Nhẹ nhất (vài chục MB), khởi động &lt;100ms</td>
+            <td class="warn">Zero-day Kernel (VD: Dirty Pipe) → đâm xuyên chiếm quyền Host</td>
+          </tr>
+          <tr class="hl-row">
+            <td><b>Tier 2</b><br><span class="dim" style="font-size:14.5px">User-space Kernel</span></td>
+            <td>gVisor (runsc)</td>
+            <td>Chèn nhân ảo <b>Sentry</b> (Go) chắn giữa Container và Host Kernel — chỉ ~20-30 syscall an toàn được gọi xuống</td>
+            <td class="ok">Chặn mọi syscall trực tiếp từ Agent · đổi từ Docker cực dễ (<code>--runtime=runsc</code>)</td>
+            <td class="warn">Giảm hiệu năng I/O (nhiều file nhỏ, mạng tốc độ cao)</td>
+          </tr>
+          <tr>
+            <td><b>Tier 3</b><br><span class="dim" style="font-size:14.5px">Hardware Virtualization</span></td>
+            <td>Kata Containers,<br>Firecracker (KVM)</td>
+            <td>MicroVM qua KVM — mỗi Sandbox có <b>Guest Kernel độc lập</b></td>
+            <td class="ok">An toàn tuyệt đối — chuẩn AWS Lambda, E2B · thoát Guest Kernel vẫn bị Hypervisor chặn</td>
+            <td class="warn">+30-128MB RAM cho Guest Kernel · cần <code>/dev/kvm</code> (Nested Virt.)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="6" data-total="13"></span></div>
+  </section>
+
+  <!-- 7. SPECTRUM -->
+  <section class="slide" data-title="Đánh đổi">
+    <p class="kicker">Phần 1 · Trade-off</p>
+    <h2 class="h2">Hiệu năng ⇄ An toàn: sự đánh đổi giữa tốc độ khởi động và biên giới Kernel</h2>
+    <div class="spectrum">
+      <div class="spec-bar anim-fade-up" data-anim="fade-up"></div>
+      <div class="spec-marks anim-stagger-list" data-anim-target>
+        <div class="spec-mark">
+          <p class="tier">Tier 1 · Docker</p>
+          <h4>⚡ Nhanh nhất · Sơ yếu nhất</h4>
+          <p>Chia sẻ Kernel trực tiếp — biên giới mỏng nhất, chỉ đủ với mã "nửa tin cậy".</p>
+        </div>
+        <div class="spec-mark">
+          <p class="tier">Tier 2 · gVisor</p>
+          <h4>⚖️ Cân bằng · dễ nâng cấp</h4>
+          <p>Thay lớp đánh chặn syscall mà không đổi công cụ triển khai — điểm ngọt cho Sandbox Kit.</p>
+        </div>
+        <div class="spec-mark">
+          <p class="tier">Tier 3 · Kata / Firecracker</p>
+          <h4>🛡️ An toàn nhất · tốn kém hơn</h4>
+          <p>Hypervisor là biên giới cuối cùng — chuẩn của AWS Lambda, E2B cho workload untrusted.</p>
+        </div>
+      </div>
+    </div>
+    <p class="dim mt-l" style="font-size:19px">Câu hỏi kiến trúc: <b>đặt Sandbox Kit ở đâu trên phổ này?</b> — và quan trọng hơn, <i>có di chuyển được không?</i> (sẽ trả lời ở Phần 2)</p>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="7" data-total="13"></span></div>
+  </section>
+
+  <!-- 8. DIVIDER: PHẦN 2 -->
+  <section class="slide center tc" data-title="Phần 2">
+    <div style="max-width:860px;margin:0 auto">
+      <p class="kicker anim-fade-down" data-anim="fade-down">Phần 2 / 2</p>
+      <h1 class="h1 anim-rise-in" data-anim="rise-in" style="font-size:88px">Cơ chế <span class="gradient-text">Thực thi</span></h1>
+      <div class="divider-accent" style="margin:24px auto"></div>
+      <p class="lede" style="margin:0 auto">Execution Architecture — điều khiển môi trường đã khóa kín một cách chính xác đến từng mili-giây.</p>
+    </div>
+  </section>
+
+  <!-- 9. 4 YÊU CẦU KHẮT KHE -->
+  <section class="slide" data-title="4 yêu cầu">
+    <p class="kicker">Phần 2 · Đặt vấn đề</p>
+    <h2 class="h2">Nghịch lý điều khiển từ xa — 4 yêu cầu khắt khe của AI Agent</h2>
+    <p class="dim" style="font-size:19px">Host Orchestrator phải gửi lệnh vào lồng kín — khác hẳn con người gõ lệnh, vì Agent <b>không tự biết xử lý tình huống</b>:</p>
+    <div class="grid g2 mt-l anim-stagger-list" data-anim-target>
+      <div class="card">
+        <h4>🧠 1 · Tính lưu trạng thái (Statefulness)</h4>
+        <p class="dim">Bước 1: <code>cd /workspace/app && export ENV=dev</code> → bước 2: <code>pytest</code>. Bước 2 phải <b>kế thừa thư mục, biến môi trường</b> của bước 1, hoặc giữ biến dữ liệu trong RAM (như Jupyter).</p>
+      </div>
+      <div class="card">
+        <h4>⏱️ 2 · Kiểm soát vòng đời lệnh</h4>
+        <p class="dim">Biết chính xác đến từng mili-giây: lệnh bắt đầu khi nào, dòng nào là <code>stdout</code> / <code>stderr</code>, khi nào kết thúc, <b>exit_code</b> là bao nhiêu.</p>
+      </div>
+      <div class="card">
+        <h4>🪝 3 · Xử lý treo (Non-blocking & Timeout)</h4>
+        <p class="dim">Agent <b>không biết bấm Ctrl+C</b> khi lệnh hỏi <code>[y/N]</code> hay khi chạy server ngầm (<code>npm run dev</code>). Tầng thực thi phải tự xử lý, không làm treo chết luồng suy nghĩ của Agent.</p>
+      </div>
+      <div class="card">
+        <h4>🔀 4 · Tách Mạng điều khiển / Mạng người dùng</h4>
+        <p class="dim">Kênh truyền lệnh Host → Sandbox phải <b>vẫn hoạt động ngay cả khi</b> Sandbox bị cắt hoàn toàn Internet (<code>--network none</code>).</p>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="9" data-total="13"></span></div>
+  </section>
+
+  <!-- 10. 3 MÔ HÌNH THỰC THI -->
+  <section class="slide" data-title="3 mô hình thực thi">
+    <p class="kicker">Phần 2 · Sự tiến hóa</p>
+    <h2 class="h2">Ba mô hình thực thi — vì sao docker exec là ngõ cụt</h2>
+    <div class="card mt-l" style="padding:4px 12px">
+      <table class="t">
+        <thead>
+          <tr><th style="width:18%">Tiêu chí</th><th style="width:26%">M1 · docker exec <span class="dim">Stateless</span></th><th style="width:27%">M2 · Giữ ống PTY từ ngoài <span class="dim">Stream</span></th><th>M3 · Daemon bên trong Sandbox <span class="dim">★ Chuẩn đích</span></th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Bản chất</b></td>
+            <td>Docker Engine đẻ tiến trình <code>/bin/sh -c</code> mới cho <b>mỗi</b> lệnh, xong tự hủy</td>
+            <td>Giữ 1 phiên <code>/bin/bash</code> duy nhất, bơm chuỗi lệnh vào <b>stdin/stdout liên tục</b></td>
+            <td class="hl-row"><b>Server nhỏ (Go/Python) chạy sẵn</b> trong Sandbox — Host gọi API gRPC / WebSocket</td>
+          </tr>
+          <tr>
+            <td><b>Giữ trạng thái</b><br><span class="dim" style="font-size:14.5px">cd, export, RAM</span></td>
+            <td class="warn">Không — lệnh sau <b>mất sạch</b> trạng thái lệnh trước</td>
+            <td class="warn">Có cho Bash, nhưng rất khó quản lý trạng thái RAM của Python/Node</td>
+            <td class="hl-row ok">Hoàn hảo — Daemon tự quản cả phiên Bash (PTY) lẫn nhân Jupyter (ipykernel)</td>
+          </tr>
+          <tr>
+            <td><b>Phát hiện kết thúc<br>& exit_code</b></td>
+            <td class="ok">Dễ — tiến trình tự chết khi xong</td>
+            <td class="warn">Rất khó & dễ lỗi — phải <b>đoán</b> kết thúc qua đánh dấu <code>echo "---DONE:$?---"</code></td>
+            <td class="hl-row ok">Chuẩn xác 100% — Daemon quản tiến trình con bằng OS API, đóng gói kết quả (Protobuf/JSON)</td>
+          </tr>
+          <tr>
+            <td><b>Timeout &<br>giết tiến trình</b></td>
+            <td class="warn">Gọi <code>kill</code> qua Docker API — dễ <b>bỏ sót tiến trình con</b></td>
+            <td class="warn">Rất khó ngắt sạch nếu lệnh con chiếm quyền terminal</td>
+            <td class="hl-row ok">Tự động & triệt để — gắn vào <b>Process Group (pgid)</b>, diệt cả cây tiến trình khi hết giờ</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="10" data-total="13"></span></div>
+  </section>
+
+  <!-- 11. GIẢI PHẪU MÔ HÌNH 3 -->
+  <section class="slide" data-title="Giải phẫu Daemon">
+    <p class="kicker">Phần 2 · In-Container Daemon Architecture</p>
+    <h2 class="h2">Giải phẫu Mô hình 3 — bốn mảnh ghép kỹ thuật</h2>
+    <div class="arch anim-stagger-list" data-anim-target>
+      <div class="tier"><div class="tname">Host<small>Orchestrator</small></div>
+        <div class="cells three">
+          <div class="cell"><div class="ic">🧠</div><h4>Agent Tool Executor</h4><p>Điều phối quyết định chạy lệnh nào</p></div>
+          <div class="cell" style="grid-column:span 2"><div class="ic">📡</div><h4>Kênh điều khiển</h4><p>gRPC / WebSocket · Unix Socket hoặc AF_VSOCK — <b>độ trễ ≈ 0, không mở cổng TCP/IP</b> nào trên Sandbox</p></div>
+        </div>
+      </div>
+      <div class="bridge"><span class="pill pill-accent">Unary — lệnh ngắn</span><span class="pill">Server Streaming — log trực tiếp</span><span class="pill">Context Cancellation — tự hủy khi đứt kết nối</span></div>
+      <div class="tier hl"><div class="tname">Sandbox<small>đã cô lập</small></div>
+        <div class="cells three">
+          <div class="cell"><div class="ic">⚙️</div><h4>In-Container Daemon</h4><p>gRPC Server chạy bên trong — <b>inject qua Static Binary bind mount :ro</b>, Agent không thể xóa/sửa</p></div>
+          <div class="cell"><div class="ic">⌨️</div><h4>Persistent PTY</h4><p>Giữ trạng thái Bash giữa các lệnh</p></div>
+          <div class="cell"><div class="ic">🧪</div><h4>Jupyter Kernel</h4><p>Giữ biến & dữ liệu trong RAM</p></div>
+        </div>
+      </div>
+      <div class="bridge"><span class="pill">tini / --init ở PID 1 — chống Zombie Process</span><span class="pill">setpgid — mỗi lệnh 1 Process Group, SIGKILL vào -pgid diệt cả cây</span><span class="pill">Lọc ANSI escape + truncate đầu ra quá ngưỡng</span></div>
+    </div>
+    <div class="deck-footer"><span class="dim2">Sandbox Kit · Isolation & Execution</span><span class="slide-number" data-current="11" data-total="13"></span></div>
+  </section>
+
+  <!-- 12. KẾT LUẬN -->
+  <section class="slide center tc" data-title="Kết luận">
+    <div style="max-width:1000px;margin:0 auto">
+      <p class="kicker">Điểm chốt kiến trúc</p>
+      <h2 class="h2" style="margin-bottom:28px">Tách tầng Thực thi → tầng Cô lập trở thành <span class="gradient-text">thứ có thể thay thế</span></h2>
+      <blockquote class="anim-fade-up" data-anim="fade-up" style="font-size:25px;line-height:1.7;font-style:italic;color:var(--text-2);border-left:3px solid var(--accent);padding:8px 0 8px 28px;text-align:left">
+        Nếu chỉ dùng <code>docker exec</code> (Mô hình 1 & 2), hệ thống bị <b>khóa chặt vào Docker</b>. Khi tách Tầng Thực thi thành <b>In-Container Daemon</b> giao tiếp qua gRPC/Socket (Mô hình 3), logic thực thi lệnh của Agent <b>hoàn toàn độc lập với Tầng Cô lập</b> — có thể nâng cấp lớp vỏ từ Docker (runc) lên gVisor (runsc) hay Kata MicroVM <b>bất cứ lúc nào, không sửa một dòng code thực thi nào</b>.
+      </blockquote>
+      <div class="row wrap mt-l" style="justify-content:center">
+        <span class="pill">Docker (runc)</span><span class="dim">→</span><span class="pill">gVisor (runsc)</span><span class="dim">→</span><span class="pill pill-accent">Kata / Firecracker</span>
+        <span class="dim" style="font-size:16px">— đổi lớp vỏ, giữ nguyên mọi code thực thi</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13. THANKS -->
+  <section class="slide center tc" data-title="Thanks">
+    <h1 class="h1" style="font-size:140px;line-height:1"><span class="gradient-text">Trân trọng cảm ơn</span></h1>
+    <p class="lede mt-l">Sandbox Kit — Cô lập & Thực thi trong môi trường AI Agent</p>
+    <p class="dim mt-s" style="font-size:17px">← → để duyệt lại · O để xem tổng quan · T để đổi giao diện</p>
+  </section>
+
+</div>
+<script src="../../../../.agents/skills/html-ppt/assets/runtime.js"></script>
+</body></html>

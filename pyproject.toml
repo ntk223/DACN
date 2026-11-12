@@ -1,0 +1,23 @@
+[project]
+name = "sandbox-kit-clone"
+version = "0.1.0"
+description = "Nền tảng cho AI agent lập trình làm việc trên code qua MCP — VFS (SQLite) là kho lưu trữ trung tâm."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "mcp>=1.30,<2",
+    "pydantic",
+    "pydantic-settings",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

@@ -1,0 +1,222 @@
+══════════════════════════════════════════════════════════════════
+SCRIPT THUYẾT TRÌNH (10 PHÚT — 15 SLIDE)
+Cơ chế Cô lập & Thực thi trong AI Agent Sandbox — Sandbox Kit
+══════════════════════════════════════════════════════════════════
+Nguyên tắc: slide râu ria (bìa, divider, cảm ơn) lướt nhanh —
+chỉ đọc tiêu đề, dành trọn thời gian cho các slide chính:
+S6 (phổ cô lập), S8 (interface), S11 (ba mô hình), S12 (ba luồng),
+S13 (daemon).
+Điều khiển: mũi tên trái/phải hoặc Space để chuyển slide.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 1 — BÌA (10 giây — lướt)
+────────────────────────────────────────────────────────────────────
+Kính thưa thầy, em xin trình bày: "Cơ chế Cô lập và Thực thi trong
+môi trường AI Agent Sandbox" — một phần cốt lõi của dự án Sandbox Kit.
+→ chuyển slide ngay, không giải thích thêm.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 2 — HAI MẶT CỦA BÀI TOÁN (20 giây — lướt)
+────────────────────────────────────────────────────────────────────
+Đề tài có hai mặt đối lập: nhốt Agent thật chặt ("Đóng lồng"), nhưng
+vẫn điều khiển được từ ngoài ("Mở lối giao tiếp"). Lồng càng kín thì
+giao tiếp càng khó — toàn bộ thiết kế phía sau là lời giải cho đánh
+đổi này.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 3 — DIVIDER PHẦN 1 (5 giây — chỉ đọc tiêu đề)
+────────────────────────────────────────────────────────────────────
+"Phần 1 — Cơ chế Cô lập."
+
+────────────────────────────────────────────────────────────────────
+SLIDE 4 — ĐẶT VẤN ĐỀ: CODE CỦA AGENT KHÁC GI CODE TRUYỀN THỐNG
+(45 giây)
+────────────────────────────────────────────────────────────────────
+Vì sao đây là bài toán riêng? Vì code của Agent là mã không đáng
+tin, khó lường: do AI tự sinh ra, hoặc bị kẻ xấu điều khiển qua
+Prompt Injection — lừa Agent bằng chính câu lệnh.
+Hậu quả: Agent có thể chạy lệnh hủy diệt như `rm -rf /`, vòng lặp
+vô tận, Fork Bomb — lệnh tự nhân bản làm sập máy; hoặc khai thác
+lỗ hổng hệ điều hành để thoát ra ngoài chiếm máy chủ thật
+(Container Escape).
+Ngược lại, ứng dụng truyền thống chạy mã đáng tin, đã qua kiểm
+duyệt — Docker chỉ để đóng gói môi trường. Cùng là Docker, nhưng
+bài toán hoàn toàn khác.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 5 — BA TRỤ CỘT CÔ LẬP (45 giây)
+────────────────────────────────────────────────────────────────────
+Mọi sandbox đạt chuẩn phải qua 3 lớp khóa:
+Lớp 1 — Không gian nhìn (Namespaces): "bịt mắt" tiến trình bên
+trong bằng các không gian riêng biệt.
+Lớp 2 — Tài nguyên (cgroups): "đóng khung" hạn mức phần cứng — bộ
+nhớ, CPU, số tiến trình — để Agent không chiếm dụng tài nguyên làm
+sập máy chủ.
+Lớp 3 — Quyền hạn và lệnh hệ thống: tước quyền root, khóa vùng hệ
+thống chỉ đọc, và bộ lọc chặn lệnh nguy hiểm như Seccomp, AppArmor.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 6 — PHỔ CÔNG NGHỆ CÔ LẬP (80 giây — SLIDE CHÍNH ★)
+────────────────────────────────────────────────────────────────────
+Cùng nhiệm vụ nhốt Agent, nhưng có BA cấp độ công nghệ, phân biệt
+bởi ranh giới với nhân hệ điều hành:
+CẤP 1 — Docker: Agent gọi thẳng vào nhân hệ điều hành — ranh giới
+mỏng nhất. Nhẹ nhất, khởi động dưới 100 mili-giây, nhưng nếu nhân
+có lỗ hổng chưa vá (ví dụ Dirty Pipe) thì mã độc chiếm được máy chủ.
+CẤP 2 — gVisor (của Google): chèn thêm một lớp nhân ảo trung gian.
+Agent chỉ gọi được khoảng 20–30 lệnh hệ thống an toàn. Đổi từ
+Docker cực dễ, nhưng I/O chậm hơn.
+CẤP 3 — Kata / Firecracker (của AWS): máy ảo riêng với nhân độc lập
+hoàn toàn, chạy trên hypervisor — biên giới cuối cùng. Chuẩn mà AWS
+Lambda và E2B dùng. An toàn tuyệt đối, nhưng tốn thêm RAM và cần
+ảo hóa phần cứng KVM.
+Câu hỏi kiến trúc: Sandbox Kit đặt mình ở đâu trên phổ này — và có
+DI CHUYỂN ĐƯỢC KHÔNG? Em trả lời ở cuối phần sau.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 7 — CÁC NỀN TẢNG THỰC TẾ (35 giây)
+────────────────────────────────────────────────────────────────────
+Phổ này không phải lý thuyết — liệt kê nhanh:
+AWS Lambda và E2B dùng Firecracker (máy ảo riêng cho mỗi chức năng /
+mỗi phiên); Modal và Google Cloud Run dùng gVisor; OpenSandbox dùng
+container gia cố kèm daemon bên trong; Cloudflare Workers cô lập
+bên trong bộ thực thi ngôn ngữ.
+Nhận xét: cấp độ càng cao càng được nền tảng lớn tin dùng cho code
+hoàn toàn không tin cậy.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 8 — TRỪU TƯỢNG HÓA: SANDBOXRUNTIME INTERFACE (70 giây — SLIDE CHÍNH ★)
+────────────────────────────────────────────────────────────────────
+Quay lại câu hỏi: CÓ di chuyển được không? Có — bằng cách đặt một
+lớp giao diện trung gian tên SandboxRuntime giữa phần điều khiển và
+công nghệ cô lập.
+Phần điều khiển bên ngoài KHÔNG cần biết môi trường được tạo bằng
+công nghệ nào — chỉ gọi các hàm của giao diện: tạo, hủy, gắn kênh
+điều khiển. Dưới là ba bộ chuyển đổi: Docker, gVisor, Kata — cùng
+một chuẩn chung, nên đổi công nghệ chỉ là đổi một dòng cấu hình,
+KHÔNG đổi code.
+Mỗi cấp có năng lực riêng (chỉ Firecracker có snapshot, chỉ Kata
+cần KVM) — mỗi bộ máy tự khai báo năng lực, phần trên tự giảm tính
+năng một cách có kiểm soát.
+Đây không phải ý tưởng mới: hệ thống của Google và Kubernetes đã
+thiết kế đúng như vậy, đã kiểm chứng ở quy mô rất lớn.
+
+thiết kế kiến trúc, techstack
+────────────────────────────────────────────────────────────────────
+SLIDE 9 — DIVIDER PHẦN 2 (5 giây — chỉ đọc tiêu đề)
+────────────────────────────────────────────────────────────────────
+"Phần 2 — Cơ chế Thực thi: điều khiển môi trường đã khóa kín một
+cách chính xác đến từng mili-giây."
+
+────────────────────────────────────────────────────────────────────
+SLIDE 10 — BỐN YÊU CẦU KHẮT KHE (50 giây)
+────────────────────────────────────────────────────────────────────
+Điều khiển sandbox từ xa KHÁC hẳn con người gõ lệnh, vì Agent không
+tự biết xử lý tình huống. Bốn yêu cầu:
+1. Tính lưu trạng thái — bước 1 vào thư mục, đặt biến; bước 2 chạy
+   pytest phải kế thừa đúng.
+2. Kiểm soát vòng đời lệnh — biết chính xác bắt đầu khi nào, đầu ra
+   là gì, khi nào kết thúc, mã thoát exit_code là bao nhiêu.
+3. Xử lý treo — Agent KHÔNG biết bấm Ctrl+C khi lệnh hỏi [y/N] hay
+   chạy server ngầm. Tầng thực thi phải tự xử lý.
+4. Tách kênh điều khiển khỏi Internet — kênh truyền lệnh vẫn hoạt
+   động ngay cả khi sandbox bị cắt Internet hoàn toàn.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 11 — BA MÔ HÌNH THỰC THI (80 giây — SLIDE CHÍNH ★)
+────────────────────────────────────────────────────────────────────
+Ba cách hiện thực hóa, hai cách đầu là ngõ cụt:
+MÔ HÌNH 1 — docker exec: mỗi lệnh tạo một tiến trình shell mới,
+xong tự hủy. KHÔNG nhớ trạng thái — lệnh sau mất sạch trạng thái
+lệnh trước. Loại.
+MÔ HÌNH 2 — giữ phiên terminal từ ngoài: có trạng thái cho Bash,
+nhưng phát hiện kết thúc phải ĐOÁN qua đánh dấu echo — rất khó và
+dễ lỗi; khi cần giết tiến trình treo thì rất khó ngắt sạch.
+MÔ HÌNH 3 (chọn) — Daemon bên trong: đặt sẵn một server nhỏ chạy
+TRONG sandbox, Host gọi API. Giữ trạng thái hoàn hảo cả phiên Bash
+lẫn nhân Jupyter; phát hiện kết thúc chuẩn xác 100% vì quản tiến
+trình con trực tiếp; hết giờ thì diệt CẢ NHÓM tiến trình con cháu —
+triệt để. Cả ba hàng cuối của bảng đều nghiêng về Mô hình 3.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 12 — BA LUỒNG HOẠT ĐỘNG CỦA BA CÁCH THỰC THI (40 giây)
+────────────────────────────────────────────────────────────────────
+Sơ đồ này tóm tắt ba mô hình bằng ba luồng:
+- M1: Docker Engine mỗi lần đẻ một tiến trình shell mới — chạy xong
+  tự hủy — nên trạng thái mất sạch giữa các lệnh.
+- M2: giữ một phiên bash, bơm chuỗi lệnh vào ống stdin/stdout —
+  nhưng kết thúc lệnh phải ĐOÁN qua đánh dấu echo.
+- M3: Host gọi API, Daemon bên trong quản trực tiếp ba loại executor
+  — lệnh đơn, phiên Bash, Jupyter — nên giữ trạng thái, biết chính
+  xác kết thúc, diệt cả cây tiến trình.
+────────────────────────────────────────────────────────────────────
+SLIDE 13 — GIẢI PHẪU MÔ HÌNH 3 (60 giây — SLIDE CHÍNH ★)
+────────────────────────────────────────────────────────────────────
+Kiến trúc đầy đủ:
+- Bên ngoài: Host Orchestrator giao tiếp với daemon bằng gRPC hoặc
+  WebSocket, đi qua KÊNH NỘI BỘ RIÊNG — không đi qua Internet — nên
+  sandbox cắt mạng vẫn điều khiển được. Hai chiều: lệnh đi xuống,
+  log đi lên. Tự hủy lệnh khi mất kết nối.
+- Bên trong môi trường đã cô lập: Daemon nhận lệnh và phân nhánh ba
+  loại executor — lệnh đơn chạy xong tự hủy, phiên Bash giữ trạng
+  thái, nhân Jupyter giữ biến trong RAM.
+- Ba chi tiết đáng giá: tiến trình gác tự dọn chống "xác chết"
+  (Zombie); diệt cả nhóm tiến trình con cháu khi hết giờ; làm sạch
+  ký tự rác và cắt đầu ra quá dài.
+- Daemon được đưa vào dưới dạng file chỉ-đọc — Agent không thể sửa
+  hay xóa.
+Nói thêm: đây là mô hình CHUẨN NGÀNH — OpenSandbox, E2B cũng đặt
+daemon bên trong như vậy.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 14 — ĐIỂM CHỐT KIẾN TRÚC (45 giây)
+────────────────────────────────────────────────────────────────────
+Tóm lại trong một câu:
+Nếu chỉ dùng docker exec, hệ thống bị khóa chặt vào Docker. Khi đặt
+một trình điều khiển nhỏ chạy bên trong sandbox, giao tiếp qua kênh
+riêng, thì logic thực thi lệnh của Agent HOÀN TOÀN ĐỘC LẬP với tầng
+cô lập — có thể nâng cấp lớp vỏ bất cứ lúc nào mà không sửa một
+dòng code thực thi nào.
+Thực tế: đổi từ Docker sang gVisor sang Kata chỉ là đổi cấu hình.
+Đây là lời trả lời cho câu hỏi ở slide 6: Sandbox Kit DI CHUYỂN
+ĐƯỢC trên phổ cô lập.
+
+────────────────────────────────────────────────────────────────────
+SLIDE 15 — CẢM ƠN (10 giây — lướt)
+────────────────────────────────────────────────────────────────────
+Em xin trân trọng cảm ơn thầy. (mời thầy đặt câu hỏi)
+
+══════════════════════════════════════════════════════════════════
+PHỤ LỤC — CÂU HỎI THẦY CÓ THỂ HỎI
+══════════════════════════════════════════════════════════════════
+1. "Sao không dùng docker exec cho nhanh?"
+   → Mất trạng thái giữa các lệnh; Agent chạy nhiều bước liên tiếp
+     thì hỏng bước 2. Chi tiết ở slide 11.
+2. "gVisor chậm hơn thì sao?"
+   → Đánh đổi có chủ đích: I/O chậm hơn nhưng đổi được an toàn lớn;
+     và nhờ interface, chỉ config lại chứ không viết lại code.
+3. "Firecracker cần gì?"
+   → Cần /dev/kvm (ảo hóa phần cứng). Thiếu KVM thì rơi về cấp 2.
+4. "Agent có sửa được daemon không?"
+   → Không — daemon là file chỉ-đọc, Agent không thể sửa hay xóa.
+5. "Vì sao không chọn luôn cấp 3?"
+   → Cấp 3 tốn RAM và cần KVM mỗi sandbox; với workload nhiều
+     sandbox song song thì cấp thấp hợp lý hơn. Nhờ interface,
+     nâng cấp sau rất rẻ.
+6. "Hai mặt cô lập và thực thi có độc lập không?"
+   → Có — đó chính là điểm chốt ở slide 13: nhờ interface + daemon,
+     hai tầng tách rời, thay thế độc lập.
+
+══════════════════════════════════════════════════════════════════
+GHI CHÚ TỐC ĐỘ (tổng 10 phút)
+══════════════════════════════════════════════════════════════════
+S1:0:10   S2:0:20   S3:0:05   S4:0:45   S5:0:45   S6:1:20   S7:0:35
+S8:1:10   S9:0:05   S10:0:50  S11:1:20  S12:0:40  S13:1:00  S14:0:45
+S15:0:10
+Tổng: ~10 phút
+Slide râu ria (S1, S2, S3, S9, S15): 50 giây — lướt.
+Slide chính (S6, S8, S11, S13): 4 phút 50 giây — nói kỹ.
+S12 (ba luồng) là slide bổ trợ: 40 giây, chỉ tóm tắt — chi tiết đã
+nói ở S11, kiến trúc nói kỹ ở S13.
+Dự phòng: mất giờ thì cắt S7 về 20 giây, S12 về 20 giây; không bao
+giờ bỏ S6, S11, S13.

@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 900" font-family="sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#b91c1c"/></marker>
+  </defs>
+
+  <rect width="1280" height="900" fill="#ffffff"/>
+  <text x="640" y="30" text-anchor="middle" font-size="16" font-weight="700" fill="#334155">WORKSPACE SYNC — phân loại tại pull (3 phía, base = synced_sha256) → policy</text>
+
+  <rect x="60" y="48" width="1160" height="46" rx="8" fill="#fcfcfd" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="76" y="67" font-size="11" fill="#334155">INPUT pull: lặp qua <tspan font-weight="700">UNION(manifest paths, VFS file rows, pending tombstones)</tspan> — lặp manifest thôi = sandbox deletion không phát hiện được</text>
+  <text x="76" y="86" font-size="11" fill="#334155">→ hồi sinh file (bệnh B2). So 3 phía: agent_sha / vfs_sha / synced_sha256 (NULL đọc là '' — COALESCE).</text>
+
+  <text x="480" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#64748b">ĐIỀU KIỆN — hàng đầu khớp thắng, đánh giá theo thứ tự</text>
+  <text x="1085" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#64748b">KẾT LUẬN → HÀNH ĐỘNG</text>
+
+  <!-- Rows -->
+  <rect x="100" y="124" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="147" font-size="10.5" fill="#334155">1 · agent_sha == vfs_sha</text>
+  <line x1="860" y1="142" x2="946" y2="142" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="124" width="270" height="36" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="962" y="147" font-size="10.5" fill="#047857">Đồng bộ: no-op; cập nhật synced_sha</text>
+
+  <rect x="100" y="166" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="189" font-size="10.5" fill="#334155">2 · agent_sha == synced_sha ∧ vfs_sha ≠ synced_sha</text>
+  <line x1="860" y1="184" x2="946" y2="184" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="166" width="270" height="36" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="962" y="181" font-size="9.5" fill="#047857">Chỉ VFS sửa (pending push): no-op</text>
+  <text x="962" y="196" font-size="9.5" fill="#047857">KHÔNG phải conflict — push đưa xuống</text>
+
+  <rect x="100" y="208" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="231" font-size="10.5" fill="#334155">3 · agent_sha ≠ synced_sha ∧ vfs_sha == synced_sha</text>
+  <line x1="860" y1="226" x2="946" y2="226" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="208" width="270" height="36" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.2"/>
+  <text x="962" y="231" font-size="10.5" fill="#1d4ed8">Chỉ sandbox sửa: pull-back</text>
+
+  <rect x="100" y="250" width="760" height="36" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.4"/>
+  <text x="112" y="273" font-size="10.5" font-weight="700" fill="#b91c1c">4 · agent_sha ≠ synced_sha ∧ vfs_sha ≠ synced_sha</text>
+  <line x1="860" y1="268" x2="946" y2="268" stroke="#b91c1c" stroke-width="1.2" marker-end="url(#arrowRed)"/>
+  <rect x="950" y="250" width="270" height="36" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.4"/>
+  <text x="962" y="273" font-size="10.5" font-weight="700" fill="#b91c1c">Conflict thật → policy ↓</text>
+
+  <rect x="100" y="292" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="315" font-size="10.5" fill="#334155">5 · synced_sha ≠ NULL ∧ file vắng manifest</text>
+  <line x1="860" y1="310" x2="946" y2="310" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="292" width="270" height="36" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.2"/>
+  <text x="962" y="307" font-size="9.5" fill="#b45309">Sandbox xóa: tombstone</text>
+  <text x="962" y="322" font-size="9.5" fill="#b45309">(policy error → báo conflict)</text>
+
+  <rect x="100" y="334" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="357" font-size="10.5" fill="#334155">6 · synced_sha = NULL ∧ file vắng manifest</text>
+  <line x1="860" y1="352" x2="946" y2="352" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="334" width="270" height="36" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="962" y="349" font-size="9.5" fill="#047857">File VFS tạo lúc command chạy:</text>
+  <text x="962" y="364" font-size="9.5" fill="#047857">no-op (chưa từng tới sandbox)</text>
+
+  <rect x="100" y="376" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="399" font-size="10" fill="#334155">7 · tombstone pending ∧ file còn manifest ∧ agent_sha == tombstone.sha256</text>
+  <line x1="860" y1="394" x2="946" y2="394" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="376" width="270" height="36" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="962" y="391" font-size="9.5" fill="#047857">Delete chưa push tới: no-op</text>
+  <text x="962" y="406" font-size="9.5" fill="#047857">(push sẽ xóa)</text>
+
+  <rect x="100" y="418" width="760" height="36" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.4"/>
+  <text x="112" y="441" font-size="10" font-weight="700" fill="#b91c1c">8 · tombstone pending ∧ file còn manifest ∧ agent_sha ≠ tombstone.sha256</text>
+  <line x1="860" y1="436" x2="946" y2="436" stroke="#b91c1c" stroke-width="1.2" marker-end="url(#arrowRed)"/>
+  <rect x="950" y="418" width="270" height="36" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.4"/>
+  <text x="962" y="441" font-size="10.5" font-weight="700" fill="#b91c1c">Delete/modify conflict → policy ↓</text>
+
+  <rect x="100" y="460" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="483" font-size="10.5" fill="#334155">9 · tombstone pending ∧ file vắng manifest</text>
+  <line x1="860" y1="478" x2="946" y2="478" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="460" width="270" height="36" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="962" y="475" font-size="9.5" fill="#047857">Delete hoàn tất phía sandbox: no-op;</text>
+  <text x="962" y="490" font-size="9.5" fill="#047857">GC-able khi watermark đuổi kịp</text>
+
+  <rect x="100" y="502" width="760" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="112" y="525" font-size="10.5" font-style="italic" fill="#64748b">10 · không khớp hàng nào (catch-all)</text>
+  <line x1="860" y1="520" x2="946" y2="520" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <rect x="950" y="502" width="270" height="36" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="1.2"/>
+  <text x="962" y="525" font-size="10.5" fill="#475569">no-op — an toàn: không đụng</text>
+
+  <text x="100" y="560" font-size="10" fill="#475569">NULL: agent_sha ≠ synced_sha ≡ agent_sha ≠ COALESCE(synced_sha256, '') — create/create phân kỳ (synced = NULL, có manifest, agent ≠ vfs) rơi hàng 4</text>
+  <text x="100" y="578" font-size="10" fill="#475569">Thứ tự: hàng 1 trước hàng 4 — hai phía sửa ra CÙNG nội dung là đồng bộ, không phải conflict.</text>
+
+  <!-- Channel rows 4+8 → policy -->
+  <path d="M 1220 268 H 1246" fill="none" stroke="#b91c1c" stroke-width="1.4"/>
+  <path d="M 1220 436 H 1246" fill="none" stroke="#b91c1c" stroke-width="1.4"/>
+  <path d="M 1246 268 V 648 H 1222" fill="none" stroke="#b91c1c" stroke-width="1.4" marker-end="url(#arrowRed)"/>
+
+  <!-- Policy panel -->
+  <rect x="60" y="596" width="1160" height="284" rx="10" fill="#fcfcfd" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="76" y="622" font-size="12.5" font-weight="700" fill="#334155">POLICY CONFLICT — per workspace (cột conflict_policy trong workspace_meta)</text>
+
+  <rect x="80" y="636" width="555" height="130" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.4"/>
+  <text x="95" y="658" font-size="11.5" font-weight="700" fill="#047857">sandbox_wins — DEFAULT</text>
+  <text x="95" y="680" font-size="10" fill="#334155">modify/modify: pull-back ghi đè VFS + bump revision</text>
+  <text x="95" y="698" font-size="10" fill="#334155">+ cảnh báo tool response (sync_conflict_resolved) + audit log</text>
+  <text x="95" y="720" font-size="10" fill="#334155">delete/modify: hồi sinh file (row files rev R) + xóa tombstone</text>
+  <text x="95" y="738" font-size="10" fill="#334155">trong cùng tx pull + cảnh báo + audit</text>
+
+  <rect x="655" y="636" width="545" height="130" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.4"/>
+  <text x="670" y="658" font-size="11.5" font-weight="700" fill="#b45309">error</text>
+  <text x="670" y="680" font-size="10" fill="#334155">modify/modify: pull-back dừng tại file conflict; VFS giữ nguyên</text>
+  <text x="670" y="702" font-size="10" fill="#334155">delete/modify: giữ tombstone; trả danh sách conflict</text>
+  <text x="670" y="720" font-size="10" fill="#334155">cho agent tự xử lý</text>
+  <text x="670" y="742" font-size="10" font-weight="700" fill="#b45309">còn conflict chưa xử lý → sync_state.status = 'stale'</text>
+
+  <text x="80" y="792" font-size="10" fill="#475569">• sandbox_wins mặc định: side effect của exec là thật (formatter, codegen) — agent nhận cảnh báo để tự đối chiếu</text>
+  <text x="80" y="812" font-size="10" fill="#475569">• error cho workspace nghi ngại overwrite (bản dịch, data cẩn trọng) — stale là hành vi an toàn: push sau tự tính lại delta</text>
+  <text x="80" y="832" font-size="10" fill="#475569">• vfs_wins KHÔNG cần làm policy — nó chính là push (MCP edit → push lần sau đè sandbox) · không thiết kế 3-way merge (ngoài tầm phase 1)</text>
+  <text x="80" y="858" font-size="9.5" font-style="italic" fill="#94a3b8">chi tiết: docs/design/01-workspace-sync.md mục 7</text>
+</svg>

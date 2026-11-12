@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 968" font-family="sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="968" fill="#ffffff"/>
+  <text x="640" y="30" text-anchor="middle" font-size="16" font-weight="700" fill="#334155">WORKSPACE SYNC — 3 luồng sync (sequence)</text>
+
+  <!-- Lifelines -->
+  <rect x="25" y="52" width="150" height="30" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="100" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">AI AGENT</text>
+  <rect x="285" y="52" width="150" height="30" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.2"/>
+  <text x="360" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">MANAGER + WS SYNC</text>
+  <rect x="545" y="52" width="150" height="30" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2"/>
+  <text x="620" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#047857">VFS (workspace DB)</text>
+  <rect x="805" y="52" width="150" height="30" rx="6" fill="#fff" stroke="#d97706" stroke-width="1.2"/>
+  <text x="880" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">EXEC AGENT</text>
+  <rect x="1045" y="52" width="150" height="30" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.2"/>
+  <text x="1120" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4ed8">CLOUD</text>
+
+  <line x1="100" y1="82" x2="100" y2="916" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="360" y1="82" x2="360" y2="916" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="620" y1="82" x2="620" y2="916" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="880" y1="82" x2="880" y2="916" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="1120" y1="82" x2="1120" y2="916" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <!-- Band 1: MATERIALIZE -->
+  <rect x="40" y="96" width="1200" height="210" fill="#fcfcfd" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="56" y="118" font-size="12.5" font-weight="700" fill="#334155">① MATERIALIZE — sandbox_create (seed qua volume, KHÔNG qua sync)</text>
+
+  <line x1="360" y1="150" x2="620" y2="150" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="142" text-anchor="middle" font-size="10" fill="#475569">export files rev ≤ R → volume</text>
+
+  <line x1="360" y1="180" x2="620" y2="180" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="172" text-anchor="middle" font-size="10" fill="#475569">set synced_sha256 cho toàn bộ file (Tx-A)</text>
+
+  <rect x="250" y="206" width="220" height="24" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+  <text x="360" y="222" text-anchor="middle" font-size="10" fill="#334155">Tx-B (system DB): sync_state = {R, synced}</text>
+
+  <text x="660" y="264" font-size="10" font-style="italic" fill="#64748b">file cloud KHÔNG download lúc create — vào prefetch list (pre-step lệnh đầu, mục 6.1)</text>
+
+  <!-- Band 2: PUSH -->
+  <rect x="40" y="316" width="1200" height="290" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="56" y="338" font-size="12.5" font-weight="700" fill="#334155">② PUSH — pre-exec command_run (điều kiện: agent healthy)</text>
+
+  <rect x="250" y="350" width="220" height="24" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+  <text x="360" y="366" text-anchor="middle" font-size="10" fill="#334155">R == last_synced? SKIP — đường nóng 0ms</text>
+
+  <line x1="360" y1="392" x2="620" y2="392" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="384" text-anchor="middle" font-size="10" fill="#475569">delta: files rev &gt; L ∪ tombstones rev &gt; L</text>
+
+  <line x1="360" y1="424" x2="880" y2="424" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="620" y="416" text-anchor="middle" font-size="10" fill="#475569">gRPC SyncFiles — batch {put[], delete[]}</text>
+
+  <line x1="880" y1="456" x2="360" y2="456" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="620" y="448" text-anchor="middle" font-size="10" fill="#475569">ack per entry (path + sha256)</text>
+
+  <text x="620" y="484" text-anchor="middle" font-size="10" font-style="italic" fill="#64748b">agent unreachable → fallback provider.sync_files (put_archive / tar -x)</text>
+
+  <line x1="360" y1="512" x2="620" y2="512" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="504" text-anchor="middle" font-size="10" fill="#475569">Tx-A (workspace DB): set synced_sha các entry acked</text>
+
+  <rect x="240" y="530" width="240" height="24" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+  <text x="360" y="546" text-anchor="middle" font-size="10" fill="#334155">Tx-B (system DB): watermark = R · status=synced</text>
+
+  <text x="70" y="584" font-size="10.5" font-weight="700" fill="#b91c1c">FAIL-FAST: push không hoàn tất (3 ưu tiên) → command_run trả sync_unavailable — KHÔNG exec, KHÔNG pull</text>
+
+  <!-- Band 3: PULL -->
+  <rect x="40" y="616" width="1200" height="290" fill="#fcfcfd" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="56" y="638" font-size="12.5" font-weight="700" fill="#334155">③ PULL — post-exec (exit bất kỳ; interrupt → pull best-effort)</text>
+
+  <line x1="360" y1="664" x2="880" y2="664" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="620" y="656" text-anchor="middle" font-size="10" fill="#475569">AgentManifest — scan /workspace (cache mtime, size)</text>
+
+  <line x1="880" y1="696" x2="360" y2="696" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="620" y="688" text-anchor="middle" font-size="10" fill="#475569">[{path, sha256, size, mtime}]</text>
+
+  <rect x="230" y="712" width="260" height="24" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+  <text x="360" y="728" text-anchor="middle" font-size="10" fill="#334155">phân loại 3 phía — base synced_sha256 (sơ đồ conflict)</text>
+
+  <line x1="360" y1="756" x2="620" y2="756" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="748" text-anchor="middle" font-size="10" fill="#475569">Tx-A (qua VFS): apply-delta files/tombstone + bump rev</text>
+
+  <line x1="360" y1="788" x2="880" y2="788" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="620" y="780" text-anchor="middle" font-size="10" fill="#475569">presigned PUT — file ≥ 2MB (multipart ≥ 100MB)</text>
+
+  <line x1="880" y1="820" x2="1120" y2="820" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowGray)"/>
+  <text x="1000" y="812" text-anchor="middle" font-size="10" fill="#64748b">PUT thẳng + ChecksumSHA256</text>
+
+  <text x="940" y="848" font-size="10" font-style="italic" fill="#64748b">Manager verify qua GetObjectAttributes — không download</text>
+
+  <rect x="240" y="860" width="240" height="24" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+  <text x="360" y="876" text-anchor="middle" font-size="10" fill="#334155">Tx-B (system DB): operations + status — KHÔNG đụng watermark</text>
+
+  <!-- Bottom strip -->
+  <rect x="40" y="916" width="1200" height="40" fill="#fcfcfd" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="56" y="940" font-size="10.5" fill="#475569">Mỗi self-tag = 1 tx ngắn trên đúng DB sở hữu · watermark CHỈ advance ở Tx-B của push-ack · bytes lớn không bao giờ qua Manager</text>
+</svg>
