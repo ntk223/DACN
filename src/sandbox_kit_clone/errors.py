@@ -17,6 +17,8 @@ class ErrorCode(str, Enum):
     invalid_request = "invalid_request"
     conflict = "conflict"
     provider_unavailable = "provider_unavailable"
+    agent_unavailable = "agent_unavailable"
+    capability_unavailable = "capability_unavailable"
     internal_error = "internal_error"
 
 

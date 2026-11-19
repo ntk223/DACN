@@ -8,8 +8,13 @@ provider nào không có thì trả ``available: false`` thay vì lỗi.
 from __future__ import annotations
 
 import base64
+import codecs
+import json
+import queue
+import threading
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from sandbox_kit_clone.errors import AppError, ErrorCode
@@ -27,6 +32,13 @@ class StartBody(BaseModel):
 
 class RenewBody(BaseModel):
     ttl_seconds: int = 3600
+
+
+class ExecBody(BaseModel):
+    command: str
+    cwd: str = ""
+    timeout_seconds: int = 0
+    env: dict[str, str] = {}
 
 
 def _manager(request: Request) -> Manager:
@@ -63,6 +75,50 @@ def start(request: Request, session_id: str, body: StartBody) -> dict:
     cpu = body.cpu if body.cpu and body.cpu > 0 else None
     memory = body.memory if body.memory and body.memory > 0 else None
     return _manager(request).sandbox_start(session_id, body.ttl_seconds, cpu, memory)
+
+
+@admin_sandbox_router.post("/sessions/{session_id}/exec")
+def exec_command(request: Request, session_id: str, body: ExecBody) -> StreamingResponse:
+    """Chạy lệnh, trả NDJSON từng dòng: ``{"type":"output","stream","text"}`` … rồi
+    ``{"type":"result", ...}`` (hoặc ``{"type":"error","error":{...}}``). Đi qua đúng
+    ``Manager.command_run`` như tool MCP (kiểm trạng thái, ghi sổ thao tác)."""
+    manager = _manager(request)
+    events: queue.Queue = queue.Queue()
+    decoders = {k: codecs.getincrementaldecoder("utf-8")("replace") for k in ("stdout", "stderr")}
+
+    def on_output(stream: str, data: bytes) -> None:
+        text = decoders[stream].decode(data)
+        if text:
+            events.put({"type": "output", "stream": stream, "text": text})
+
+    def worker() -> None:
+        try:
+            result = manager.command_run(
+                session_id,
+                body.command,
+                cwd=body.cwd,
+                env=body.env or None,
+                timeout_seconds=body.timeout_seconds or None,
+                on_output=on_output,
+            )
+            events.put({"type": "result", **result})
+        except AppError as exc:
+            events.put({"type": "error", **exc.to_payload()})
+        except Exception as exc:  # noqa: BLE001 — trả lỗi dạng dữ liệu cho UI
+            events.put({"type": "error", "error": {"code": "internal_error", "message": str(exc)}})
+        finally:
+            events.put(None)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def gen():
+        while True:
+            item = events.get()
+            if item is None:
+                return
+            yield json.dumps(item, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
 
 
 @admin_sandbox_router.post("/sessions/{session_id}/{action}")

@@ -1,0 +1,52 @@
+// Giao thức Manager ↔ trình thực thi trong sandbox (mcp-integration §3.9).
+// W2: Exec + Healthcheck. SyncFiles / ListFiles bổ sung khi làm đồng bộ (W3).
+syntax = "proto3";
+
+package sandbox_kit.agent.v1;
+
+service ExecAgent {
+  // Chạy một lệnh shell; trả output theo từng đoạn, sự kiện cuối là Exit.
+  rpc Exec(ExecRequest) returns (stream ExecEvent);
+  // Agent còn sống và sẵn sàng nhận lệnh.
+  rpc Healthcheck(HealthRequest) returns (HealthReply);
+}
+
+message ExecRequest {
+  string command = 1;              // chạy bằng `bash -lc`
+  string cwd = 2;                  // tương đối với gốc workspace; rỗng = gốc
+  map<string, string> env = 3;     // cộng thêm vào môi trường mặc định
+  int32 timeout_seconds = 4;       // <= 0 → mặc định của agent
+  string request_id = 5;           // ghi log / đối chiếu sổ thao tác
+}
+
+message ExecEvent {
+  oneof event {
+    Output output = 1;
+    Exit exit = 2;
+  }
+}
+
+message Output {
+  enum Stream {
+    STDOUT = 0;
+    STDERR = 1;
+  }
+  Stream stream = 1;
+  bytes data = 2;                  // bytes thô, client tự decode
+}
+
+message Exit {
+  int32 exit_code = 1;             // -N = bị kill bởi tín hiệu N
+  bool timed_out = 2;
+  int64 duration_ms = 3;
+  string error = 4;                // lỗi trước khi chạy được lệnh (cwd sai...)
+}
+
+message HealthRequest {}
+
+message HealthReply {
+  string version = 1;
+  string workspace_root = 2;
+  int64 uptime_ms = 3;
+  int32 running = 4;               // số lệnh đang chạy
+}

@@ -87,6 +87,24 @@ def test_lifecycle_with_materialized_files(manager: Manager) -> None:
     provider.terminate_sandbox(sandbox_id)  # idempotent
 
 
+def test_command_run_inside_container(manager: Manager) -> None:
+    sid = _workspace(manager)
+    manager.sandbox_start(sid, ttl_seconds=600)
+    r = manager.command_run(sid, "cat src/app.py && whoami && pwd && python3 --version")
+    assert r["exit_code"] == 0
+    assert r["stdout"].startswith("print('hi')\nroot\n/workspace\nPython 3.12")
+    seen: list[bytes] = []
+    r = manager.command_run(sid, "echo a; sleep 0.5; echo b >&2", on_output=lambda _s, d: seen.append(d))
+    assert seen == [b"a\n", b"b\n"] and r["stderr"] == "b\n"
+    r = manager.command_run(sid, "sleep 60", timeout_seconds=1)
+    assert r["timed_out"] is True
+    # Tạm dừng / tiếp tục: kênh gRPC vẫn dùng lại được.
+    manager.sandbox_pause(sid)
+    manager.sandbox_resume(sid)
+    assert manager.command_run(sid, "echo ok")["stdout"] == "ok\n"
+    manager.sandbox_stop(sid)
+
+
 def test_orphan_is_listed_and_cleaned(manager: Manager) -> None:
     provider = manager.provider
     manager._test_sessions.append("orphan-session")  # type: ignore[attr-defined]

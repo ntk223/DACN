@@ -60,6 +60,11 @@ class Settings:
     provider: str = "fake"                     # fake | docker
     sandbox_image: str = "sandbox-kit/sandbox:w2"  # image sandbox (make image)
     sandbox_network: bool = True               # False → container không ra mạng
+    fake_exec_host: bool = False               # fake: chạy lệnh THẬT trên host (dev/test, không cô lập)
+    command_timeout_default: int = 120         # giây
+    command_timeout_max: int = 600             # giây
+    command_output_max_bytes: int = 1_048_576  # mỗi luồng stdout/stderr, giữ phần cuối
+    agent_ready_timeout: int = 90              # giây chờ trình thực thi sẵn sàng (§5.5)
 
     def __post_init__(self) -> None:
         if self.policy_mode not in _VALID_POLICY_MODES:
@@ -89,4 +94,9 @@ def get_settings() -> Settings:
         provider=_env_str(f"{ENV_PREFIX}PROVIDER", "fake"),
         sandbox_image=_env_str(f"{ENV_PREFIX}SANDBOX_IMAGE", "sandbox-kit/sandbox:w2"),
         sandbox_network=_env_bool(f"{ENV_PREFIX}SANDBOX_NETWORK", True),
+        fake_exec_host=_env_bool(f"{ENV_PREFIX}FAKE_EXEC_HOST", False),
+        command_timeout_default=_env_int(f"{ENV_PREFIX}COMMAND_TIMEOUT_DEFAULT", 120),
+        command_timeout_max=_env_int(f"{ENV_PREFIX}COMMAND_TIMEOUT_MAX", 600),
+        command_output_max_bytes=_env_int(f"{ENV_PREFIX}COMMAND_OUTPUT_MAX_BYTES", 1_048_576),
+        agent_ready_timeout=_env_int(f"{ENV_PREFIX}AGENT_READY_TIMEOUT", 90),
     )

@@ -42,7 +42,7 @@ Tùy chọn: `python3 scripts/init_db.py --data-dir /tmp/x --seed`.
 ## Sandbox Docker
 
 ```bash
-make image        # build sandbox-kit/sandbox:w2 (python:3.12-slim + git + curl)
+make image        # build sandbox-kit/sandbox:w2 (python:3.12-slim + git + curl + trình thực thi gRPC)
 make run-docker   # server dùng provider Docker (mặc định là bộ giả lập "fake")
 make test-docker  # test trên Docker thật (bộ test thường tự bỏ qua khi thiếu Docker/image)
 ```
@@ -51,12 +51,17 @@ make test-docker  # test trên Docker thật (bộ test thường tự bỏ qua 
 | :--- | :--- | :--- |
 | `SANDBOX_KIT_PROVIDER` | `fake` | `fake` (trong bộ nhớ) hoặc `docker`; giá trị lạ → dừng ngay lúc khởi động |
 | `SANDBOX_KIT_SANDBOX_IMAGE` | `sandbox-kit/sandbox:w2` | Image dùng khi bật sandbox |
-| `SANDBOX_KIT_SANDBOX_NETWORK` | `true` | `false` → container không ra mạng |
+| `SANDBOX_KIT_SANDBOX_NETWORK` | `true` | `false` → container không ra mạng (khi đó chưa chạy lệnh được) |
+| `SANDBOX_KIT_FAKE_EXEC_HOST` | `false` | bộ giả lập: `true` → `command_run` chạy lệnh THẬT trên máy host (không cô lập — chỉ dev/test) |
+| `SANDBOX_KIT_COMMAND_TIMEOUT_DEFAULT` / `_MAX` | `120` / `600` | giới hạn thời gian mỗi lệnh (giây) |
 
 Mỗi sandbox = 1 container `skc-…` + 1 volume `skc-vol-{session}` gắn `/workspace`, mang label
 `sandbox-kit=1`. Khi bật, toàn bộ file trong VFS được xuất ra volume (đánh dấu `synced_sha256`,
 mốc đồng bộ = revision hiện tại). Dừng = xóa cả container lẫn volume — file trong kho không mất.
-Cổng trình thực thi chỉ mở ở `127.0.0.1`; `/scratch` là tmpfs 256MB.
+Container chạy trình thực thi gRPC (`python -m sandbox_kit_clone.agent`, cổng 50051 chỉ ánh xạ ra
+`127.0.0.1`); `command_run` gửi lệnh `bash -lc` vào đó, output về dần theo thời gian thực.
+`/scratch` là tmpfs 256MB. Sửa `agent/proto/sandbox_agent.proto` → `make proto` rồi `make image`.
+**Chưa có:** đẩy file ghi qua MCP *sau khi* bật sandbox vào sandbox — sandbox chỉ có file tại lúc bật.
 
 ## Giao diện quản trị (dev tool)
 
@@ -67,8 +72,9 @@ Cổng trình thực thi chỉ mở ở `127.0.0.1`; `/scratch` là tmpfs 256MB.
 - `/admin/sandboxes` — **quản lý sandbox**: bật (TTL / CPU / RAM) · tạm dừng · tiếp tục · gia hạn ·
   dừng & xóa theo từng phiên; cảnh báo "lệch sổ" khi trạng thái ghi trong DB khác thực tế; danh sách
   sandbox mồ côi + nút dọn; chi tiết container (cổng, volume, giới hạn, CPU/RAM), duyệt và đọc file
-  trong `/workspace`, xem log. Tự làm mới mỗi 5 giây.
-- `/admin` — console gọi thử 13 tool MCP + REST upload/download.
+  trong `/workspace`, xem log, **khung chạy lệnh** (output hiện dần, Enter để chạy, ↑/↓ lịch sử).
+  Tự làm mới mỗi 5 giây.
+- `/admin` — console gọi thử 14 tool MCP + REST upload/download.
 - Cả hai dùng REST `/admin/api/*` (không có trong OpenAPI, **không xác thực** — chỉ chạy ở localhost).
 
 ## Kết nối MCP Inspector
@@ -94,6 +100,7 @@ claude mcp add --transport http sandbox-kit http://127.0.0.1:8000/mcp
 | `workspace_create` | Tạo dự án + phiên làm việc (sinh mã tự động) |
 | `file_write` / `file_read` / `file_edit` / `file_delete` / `file_list` | Ghi / đọc / sửa (khớp mờ) / xóa (dấu vết) / liệt kê |
 | `sandbox_start` / `sandbox_stop` / `sandbox_pause` / `sandbox_resume` / `sandbox_renew` / `sandbox_status` | Vòng đời sandbox |
+| `command_run` | Chạy lệnh shell trong sandbox — output gửi dần (log notification), timeout, kết quả chuẩn hóa |
 | `sync_status` | Trạng thái đồng bộ kho ↔ sandbox (W3 hoàn thiện) |
 
 ## Lưu ý

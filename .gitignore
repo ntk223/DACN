@@ -18,3 +18,5 @@ build/
 .v-skills/
 skills-lock.json
 v-agent-debug.log
+.run/
+.~lock.*#

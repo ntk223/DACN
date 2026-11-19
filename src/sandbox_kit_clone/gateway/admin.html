@@ -460,7 +460,7 @@ async function callMcpTool(name, args) {
   return { data: data, isError: isError };
 }
 
-/* ------------------------------ Metadata 13 tool MCP ------------------------------ */
+/* ------------------------------ Metadata 14 tool MCP ------------------------------ */
 /* fields: {key,label,type:text|number|bool|textarea,def,required,state}
  * state=true → giá trị lấy từ STATE (readonly), không cho gõ trực tiếp. */
 
@@ -511,6 +511,15 @@ const TOOLS = [
   },
   { name: "file_delete", group: "Files", desc: "Xóa file khỏi kho (còn tombstone)", fields: [SESSION_FIELD, { key: "path", label: "path", type: "text", def: "", required: true }] },
   { name: "file_list", group: "Files", desc: "Liệt kê toàn bộ file trong kho", fields: [SESSION_FIELD] },
+  {
+    name: "command_run", group: "Lệnh", desc: "Chạy lệnh shell trong sandbox (phiên phải RUNNING; output gửi dần qua log notification)",
+    fields: [
+      SESSION_FIELD,
+      { key: "command", label: "command", type: "text", def: "ls -la", required: true },
+      { key: "cwd", label: "cwd (trong /workspace, tùy chọn)", type: "text", def: "", required: false },
+      { key: "timeout_seconds", label: "timeout_seconds (0 = 120)", type: "number", def: 0, required: false },
+    ],
+  },
   { name: "sync_status", group: "Sync", desc: "Trạng thái đồng bộ kho ↔ sandbox", fields: [SESSION_FIELD] },
 ];
 

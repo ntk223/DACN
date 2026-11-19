@@ -9,10 +9,14 @@ transport MCP); app chính đặt dict này vào ``app.state.tool_fns``.
 from __future__ import annotations
 
 import base64
+import codecs
+import threading
 from collections.abc import Callable
 from urllib.parse import quote
 
-from mcp.server.fastmcp import FastMCP
+import anyio
+import anyio.to_thread
+from mcp.server.fastmcp import Context, FastMCP
 
 from sandbox_kit_clone.errors import AppError, ErrorCode
 from sandbox_kit_clone.manager.manager import Manager
@@ -148,6 +152,63 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
 
     tools["file_list"] = file_list
 
+    # --------------------------------------------------------------- lệnh
+
+    @mcp.tool()
+    async def command_run(
+        session_id: str,
+        command: str,
+        cwd: str = "",
+        env: dict[str, str] | None = None,
+        timeout_seconds: int = 0,
+        ctx: Context | None = None,
+    ) -> dict:
+        """Chạy lệnh shell (bash -lc) trong sandbox của phiên — sandbox phải đang RUNNING.
+
+        cwd tương đối với /workspace; timeout_seconds 0 = mặc định (120s), tối đa 600s — hết giờ
+        thì cả nhóm tiến trình bị kill và trả timed_out=true. Output được gửi DẦN trong lúc chạy
+        qua log notification (logger "stdout" / "stderr"); kết quả cuối có exit_code, stdout,
+        stderr (mỗi luồng giữ tối đa 1MB phần cuối, truncated=true nếu bị cắt), duration_ms.
+        Lưu ý: file ghi qua file_write SAU khi bật sandbox chưa được đẩy vào sandbox (làm sau).
+        """
+        buffer = _OutputBuffer()
+        result: dict = {}
+
+        def _run() -> None:
+            result.update(
+                _safe(
+                    lambda: manager.command_run(
+                        session_id,
+                        command,
+                        cwd=cwd,
+                        env=env,
+                        timeout_seconds=timeout_seconds or None,
+                        on_output=buffer.feed if ctx is not None else None,
+                    )
+                )
+            )
+
+        async with anyio.create_task_group() as tg:
+            done = anyio.Event()
+
+            async def _worker() -> None:
+                try:
+                    await anyio.to_thread.run_sync(_run)
+                finally:
+                    done.set()
+
+            tg.start_soon(_worker)
+            if ctx is not None:
+                sender = _LogSender(ctx)
+                while not done.is_set():
+                    with anyio.move_on_after(_OutputBuffer.FLUSH_SECONDS):
+                        await done.wait()
+                    await sender.send(buffer.take())
+                await sender.send(buffer.take(final=True))
+        return result
+
+    tools["command_run"] = command_run
+
     # ------------------------------------------------------------------ sync
 
     @mcp.tool()
@@ -158,6 +219,56 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
     tools["sync_status"] = sync_status
 
     return tools
+
+
+# ------------------------------------------------------- gửi dần output
+
+
+class _OutputBuffer:
+    """Output đang chờ gửi, theo luồng. ``feed`` chạy ở worker thread; ``take`` ở event loop."""
+
+    FLUSH_SECONDS = 0.2
+
+    def __init__(self) -> None:
+        self.decoders = {
+            "stdout": codecs.getincrementaldecoder("utf-8")("replace"),
+            "stderr": codecs.getincrementaldecoder("utf-8")("replace"),
+        }
+        self.pending = {"stdout": "", "stderr": ""}
+        self.lock = threading.Lock()
+
+    def feed(self, stream: str, data: bytes) -> None:
+        with self.lock:
+            self.pending[stream] += self.decoders[stream].decode(data)
+
+    def take(self, final: bool = False) -> list[tuple[str, str]]:
+        with self.lock:
+            if final:
+                for k, dec in self.decoders.items():
+                    self.pending[k] += dec.decode(b"", final=True)
+            batch = [(k, v) for k, v in self.pending.items() if v]
+            self.pending = {"stdout": "", "stderr": ""}
+        return batch
+
+
+class _LogSender:
+    """Gửi output thành log notification MCP (logger "stdout"/"stderr").
+
+    Client ngắt giữa chừng → thôi gửi; lệnh vẫn chạy xong và kết quả cuối vẫn trả về.
+    """
+
+    def __init__(self, ctx: Context) -> None:
+        self.ctx = ctx
+        self.broken = False
+
+    async def send(self, batch: list[tuple[str, str]]) -> None:
+        if self.broken:
+            return
+        try:
+            for stream, text in batch:
+                await self.ctx.log("info" if stream == "stdout" else "warning", text, logger_name=stream)
+        except Exception:  # noqa: BLE001
+            self.broken = True
 
 
 # ------------------------------------------------------- hiện thực tool file

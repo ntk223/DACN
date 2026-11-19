@@ -37,6 +37,7 @@ class _FakeSandbox:
     expires_at: datetime | None  # None = không hết hạn (fail-safe)
     dial_port: int
     volume_path: Path | None
+    agent: object | None = None  # grpc.Server khi exec_host=True
 
 
 class FakeProvider(SandboxProvider):
@@ -50,8 +51,12 @@ class FakeProvider(SandboxProvider):
         "isolation_tiers": ["runc"],
     }
 
-    def __init__(self, base_dir: Path | None = None) -> None:
+    def __init__(self, base_dir: Path | None = None, exec_host: bool = False) -> None:
+        """``exec_host=True``: mỗi sandbox giả chạy trình thực thi THẬT trên máy này, gốc là
+        thư mục volume giả — lệnh chạy trực tiếp trên host, KHÔNG cô lập (chỉ dùng cho test/dev).
+        """
         self.base_dir = base_dir if base_dir is not None else DEFAULT_BASE_DIR
+        self.exec_host = exec_host
         self._sandboxes: dict[str, _FakeSandbox] = {}
         self._next_dial_port = _FIRST_DIAL_PORT
 
@@ -73,14 +78,24 @@ class FakeProvider(SandboxProvider):
         volume = self._volume_dir(session_id)
         # Volume seed trước đó (prepare_workspace) được gắn vào sandbox lúc tạo.
         volume_path = volume if volume.is_dir() else None
+        agent = None
+        dial_port = self._next_dial_port
+        if self.exec_host:
+            from sandbox_kit_clone.agent.server import build_server
+
+            volume.mkdir(parents=True, exist_ok=True)
+            volume_path = volume
+            agent, dial_port = build_server(volume, "127.0.0.1:0", max_workers=4)
+            agent.start()
         self._sandboxes[sandbox_id] = _FakeSandbox(
             session_id=session_id,
             image=image,
             state="running",
             created_at=now.isoformat(),
             expires_at=expires_at,
-            dial_port=self._next_dial_port,
+            dial_port=dial_port,
             volume_path=volume_path,
+            agent=agent,
         )
         self._next_dial_port += 1
         return sandbox_id
@@ -95,6 +110,8 @@ class FakeProvider(SandboxProvider):
         sandbox = self._sandboxes.pop(sandbox_id, None)
         if sandbox is None:
             return
+        if sandbox.agent is not None:
+            sandbox.agent.stop(grace=0)
         if sandbox.volume_path is not None:
             shutil.rmtree(sandbox.volume_path, ignore_errors=True)
 
@@ -130,9 +147,15 @@ class FakeProvider(SandboxProvider):
         return str(volume)
 
     def get_dial_target(self, sandbox_id: str) -> str:
-        """Địa chỉ host:port giả lập để nối vào exec agent; sandbox lạ → AppError."""
+        """Địa chỉ host:port để nối vào exec agent; sandbox lạ → AppError.
+
+        Không bật ``exec_host`` → địa chỉ giả (không có gì lắng nghe) — ``has_exec_agent`` báo False.
+        """
         sandbox = self._get_or_raise(sandbox_id)
         return f"127.0.0.1:{sandbox.dial_port}"
+
+    def has_exec_agent(self, sandbox_id: str) -> bool:
+        return self._get_or_raise(sandbox_id).agent is not None
 
     def list_sandboxes(self) -> list[str]:
         """Mọi sandbox đang sống (sandbox đã terminate bị xóa khỏi dict nên không còn)."""

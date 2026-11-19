@@ -20,4 +20,6 @@ def get_provider(settings: Settings) -> SandboxProvider:
         return DockerProvider(image=settings.sandbox_image, network=settings.sandbox_network)
     from sandbox_kit_clone.providers.fake import FakeProvider
 
-    return FakeProvider(base_dir=Path(settings.data_dir) / "fake-sandboxes")
+    return FakeProvider(
+        base_dir=Path(settings.data_dir) / "fake-sandboxes", exec_host=settings.fake_exec_host
+    )

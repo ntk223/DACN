@@ -1,4 +1,4 @@
-.PHONY: all test lint run run-docker image test-docker clean init-db seed seed-big reset-db
+.PHONY: all test lint run run-docker image proto test-docker clean init-db seed seed-big reset-db
 
 all: lint test
 
@@ -14,8 +14,12 @@ run:
 run-docker:  ## server dùng provider Docker (cần `make image` trước)
 	SANDBOX_KIT_PROVIDER=docker PYTHONPATH=src python -m sandbox_kit_clone.main
 
+proto:     ## sinh lại code gRPC từ agent/proto/sandbox_agent.proto (cần grpcio-tools)
+	cd src && python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. \
+		sandbox_kit_clone/agent/proto/sandbox_agent.proto
+
 image:     ## build image sandbox sandbox-kit/sandbox:w2
-	docker build -t sandbox-kit/sandbox:w2 sandbox-image
+	docker build -t sandbox-kit/sandbox:w2 -f sandbox-image/Dockerfile .
 
 test-docker:  ## chỉ chạy test cần Docker thật
 	PYTHONPATH=src pytest tests/ -q -m docker

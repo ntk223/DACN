@@ -213,6 +213,10 @@ class DockerProvider(SandboxProvider):
             return ""
         return f"{bindings[0].get('HostIp') or '127.0.0.1'}:{bindings[0]['HostPort']}"
 
+    def has_exec_agent(self, sandbox_id: str) -> bool:
+        """Có đường nối vào trình thực thi (container không mạng → không có cổng)."""
+        return bool(self.get_dial_target(sandbox_id))
+
     def list_sandboxes(self) -> list[str]:
         """Mọi container sandbox (kể cả đang dừng) do provider này tạo."""
         containers = self.client.containers.list(all=True, filters={"label": f"{LABEL}=1"})

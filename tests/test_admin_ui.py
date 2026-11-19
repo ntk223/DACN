@@ -12,7 +12,7 @@ from sandbox_kit_clone.config import Settings
 from sandbox_kit_clone.gateway.app import create_app
 from sandbox_kit_clone.providers.fake import FakeProvider
 
-# Đủ 13 tool MCP phải xuất hiện trong trang admin (metadata JS sinh form).
+# Đủ 14 tool MCP phải xuất hiện trong trang admin (metadata JS sinh form).
 TOOL_NAMES = [
     "workspace_create",
     "sandbox_start",
@@ -26,6 +26,7 @@ TOOL_NAMES = [
     "file_edit",
     "file_delete",
     "file_list",
+    "command_run",
     "sync_status",
 ]
 
@@ -42,7 +43,7 @@ def client(tmp_path: Path) -> TestClient:
     return TestClient(_app(tmp_path))
 
 
-def test_admin_serves_html_with_all_13_tools(client: TestClient) -> None:
+def test_admin_serves_html_with_all_14_tools(client: TestClient) -> None:
     res = client.get("/admin")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]

@@ -22,3 +22,5 @@ markers = ["docker: cần Docker daemon + image sandbox (make test-docker)"]
 [tool.ruff]
 line-length = 110
 target-version = "py311"
+# Code sinh từ proto (make proto) — không sửa tay.
+extend-exclude = ["src/sandbox_kit_clone/agent/proto/*_pb2*.py", "src/sandbox_kit_clone/agent/proto/*.pyi"]

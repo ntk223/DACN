@@ -19,6 +19,7 @@ from pathlib import Path
 
 from sandbox_kit_clone.config import Settings
 from sandbox_kit_clone.errors import AppError, ErrorCode
+from sandbox_kit_clone.manager.exec_client import ExecClientPool
 from sandbox_kit_clone.providers.base import SandboxProvider
 from sandbox_kit_clone.system.store import SystemStore
 from sandbox_kit_clone.vfs.core import VFS
@@ -47,6 +48,7 @@ class Manager:
         data_dir.mkdir(parents=True, exist_ok=True)
         # §6.1: database hệ thống = data/system.sqlite (SystemStore tự init schema).
         self.store = SystemStore(data_dir / "system.sqlite")
+        self.exec_clients = ExecClientPool()
 
     # ------------------------------------------------------------- đường dẫn
 
@@ -255,6 +257,7 @@ class Manager:
 
     def _do_stop(self, session_id: str, sandbox_id: str | None) -> dict:
         if sandbox_id:
+            self.exec_clients.drop(sandbox_id)
             self.provider.terminate_sandbox(sandbox_id)
         self.store.update_session_state(session_id, "STANDBY")
         return {"state": "STANDBY"}
@@ -355,6 +358,83 @@ class Manager:
         except AppError:
             return None
 
+    # -------------------------------------------------------------- lệnh
+
+    def command_run(
+        self,
+        session_id: str,
+        command: str,
+        cwd: str = "",
+        env: dict[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        on_output: Callable[[str, bytes], None] | None = None,
+    ) -> dict:
+        """Chạy lệnh shell trong sandbox của phiên (phải RUNNING); trả kết quả chuẩn hóa.
+
+        ``on_output(stream, data)`` được gọi ngay khi có output (để gửi dần cho agent).
+        W2: CHƯA đẩy thay đổi VFS → sandbox trước lệnh — sandbox chỉ có file tại lúc bật.
+        """
+        if not command or not command.strip():
+            raise AppError(ErrorCode.invalid_request, "command không được rỗng")
+        timeout = timeout_seconds or self.settings.command_timeout_default
+        if timeout <= 0 or timeout > self.settings.command_timeout_max:
+            raise AppError(
+                ErrorCode.invalid_request,
+                f"timeout_seconds phải trong 1..{self.settings.command_timeout_max}",
+            )
+        session = self.store.get_session(session_id)
+        if session is None:
+            raise AppError(ErrorCode.session_not_found, f"Session không tồn tại: {session_id!r}")
+        if session["state"] != "RUNNING":
+            hint = "sandbox_resume" if session["state"] == "PAUSED" else "sandbox_start"
+            raise AppError(
+                ErrorCode.invalid_request,
+                f"session đang {session['state']} — cần RUNNING để chạy lệnh (gọi {hint} trước)",
+            )
+        sandbox_id = session["sandbox_id"]
+        has_agent = getattr(self.provider, "has_exec_agent", None)
+        if not sandbox_id or (callable(has_agent) and not has_agent(sandbox_id)):
+            raise AppError(
+                ErrorCode.capability_unavailable,
+                "Sandbox này không có trình thực thi (fake chưa bật SANDBOX_KIT_FAKE_EXEC_HOST,"
+                " hoặc container Docker không có mạng)",
+                details={"capability": "exec", "provider": getattr(self.provider, "name", "?")},
+            )
+        target = self.provider.get_dial_target(sandbox_id)
+        client = self.exec_clients.get(sandbox_id, target)
+
+        def _do() -> dict:
+            client.wait_ready(timeout=self.settings.agent_ready_timeout)
+            result = client.run(
+                command,
+                cwd=cwd,
+                env=env,
+                timeout_seconds=timeout,
+                request_id=uuid.uuid4().hex,
+                on_output=on_output,
+                max_output_bytes=self.settings.command_output_max_bytes,
+            )
+            out = {
+                "exit_code": result.exit_code,
+                "timed_out": result.timed_out,
+                "duration_ms": result.duration_ms,
+                "stdout": result.stdout.decode("utf-8", "replace"),
+                "stderr": result.stderr.decode("utf-8", "replace"),
+                "stdout_bytes": result.stdout_bytes,
+                "stderr_bytes": result.stderr_bytes,
+                "truncated": result.truncated,
+                "sandbox_id": sandbox_id,
+                "sync": {
+                    "pushed": False,
+                    "note": "Chưa đồng bộ VFS → sandbox trước lệnh (làm sau): sandbox chỉ có file tại lúc bật.",
+                },
+            }
+            if result.error:
+                out["error_detail"] = result.error
+            return out
+
+        return self._op("command_run", session["workspace_id"], sandbox_id, _do)
+
     # ------------------------------------------------------ quản trị sandbox
 
     def sandbox_overview(self) -> dict:
@@ -430,7 +510,11 @@ class Manager:
             "sandbox_orphan_cleanup",
             workspace_id,
             sandbox_id,
-            lambda: (self.provider.terminate_sandbox(sandbox_id), {"terminated": sandbox_id})[1],
+            lambda: (
+                self.exec_clients.drop(sandbox_id),
+                self.provider.terminate_sandbox(sandbox_id),
+                {"terminated": sandbox_id},
+            )[2],
         )
 
     # ------------------------------------------------------------------ sync

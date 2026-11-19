@@ -78,6 +78,9 @@
   .file.active { background: var(--border-soft); color: var(--accent); }
   .file .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   pre.out { margin: 0; background: var(--sunk); border: 1px solid var(--border-soft); border-radius: 6px; padding: 8px 10px; max-height: 320px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  .term { margin: 0; background: var(--sunk); border: 1px solid var(--border-soft); border-radius: 6px; padding: 8px 10px; min-height: 120px; max-height: 420px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  .term .err { color: var(--red); } .term .cmd { color: var(--accent); } .term .meta { color: var(--dim); }
+  input.cmdline { flex: 1; min-width: 180px; }
   #toast { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; z-index: 20; max-width: min(420px, calc(100vw - 32px)); }
   .toast { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   .toast.err { border-left-color: var(--red); } .toast.warn { border-left-color: var(--orange); }
@@ -118,6 +121,22 @@
     <div class="panel">
       <div class="panel-head"><h2>Chi tiết sandbox</h2><span id="det-id" class="dim small"></span></div>
       <div class="panel-body" id="detail"><div class="empty">Chọn một phiên có sandbox để xem.</div></div>
+    </div>
+    <div class="panel hidden" id="p-exec">
+      <div class="panel-head"><h2>Chạy lệnh</h2><span id="exec-status" class="dim small"></span></div>
+      <div class="panel-body">
+        <div class="row">
+          <input type="text" class="cmdline" id="exec-cmd" placeholder="lệnh shell, vd: ls -la   (Enter để chạy, ↑/↓ lịch sử)" autocomplete="off" spellcheck="false">
+          <button class="btn btn-primary sm" id="btn-exec">Chạy</button>
+        </div>
+        <div class="row mt small dim">
+          <label class="f">cwd (trong /workspace)<input type="text" id="exec-cwd" placeholder="." style="width:150px"></label>
+          <label class="f">timeout (giây)<input type="number" id="exec-timeout" placeholder="120" min="1" max="600"></label>
+          <span id="exec-presets" class="row"></span>
+          <button class="btn sm" id="btn-exec-clear" style="margin-left:auto">Xóa màn hình</button>
+        </div>
+        <pre class="term mt" id="exec-out"><span class="meta">Kết quả hiện dần ở đây trong lúc lệnh chạy.</span></pre>
+      </div>
     </div>
     <div class="panel hidden" id="p-files">
       <div class="panel-head"><h2>/workspace trong sandbox</h2><span id="files-count" class="dim small"></span></div>
@@ -263,7 +282,7 @@ async function doAction(s, action) {
 }
 
 function unselect() {
-  S.selected = null; S.file = null;
+  S.selected = null; S.file = null; $("p-exec").classList.add("hidden");
   $("det-id").textContent = ""; clear($("detail")); $("detail").appendChild(el("div", "empty", "Chọn một phiên có sandbox để xem."));
   $("p-files").classList.add("hidden"); $("p-logs").classList.add("hidden");
 }
@@ -305,6 +324,8 @@ async function loadDetail(id, quiet) {
     box.appendChild(wrap);
   } else if (m && m.reason) box.appendChild(el("div", "mt small dim", "Số liệu: " + m.reason));
 
+  const sess = runningSession(id);
+  $("p-exec").classList.toggle("hidden", !sess);
   const ws = d.workspace;
   $("p-files").classList.toggle("hidden", !ws);
   if (ws) renderFiles(ws);
@@ -343,6 +364,75 @@ async function loadLogs() {
     $("logs").textContent = r.available ? (r.logs || "(chưa có log)") : "Provider không hỗ trợ log.";
   } catch (e) { toast(e.message, "err"); }
 }
+
+/* ------------------------------------------------------------- chạy lệnh */
+const PRESETS = ["ls -la", "find . -type f | head -50", "python --version && git --version", "cat README.md", "for i in 1 2 3 4 5; do echo bước $i; sleep 1; done", "echo lỗi >&2; exit 2"];
+const H = { list: [], idx: -1 };
+function runningSession(sandboxId) {
+  return S.data && S.data.sessions.find((s) => s.sandbox_id === sandboxId && s.state === "RUNNING") || null;
+}
+function term(text, cls) {
+  const out = $("exec-out");
+  const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 30;
+  const span = el("span", cls || null, text); out.appendChild(span);
+  if (atBottom) out.scrollTop = out.scrollHeight;
+}
+async function runCommand() {
+  const sess = runningSession(S.selected);
+  const command = $("exec-cmd").value.trim();
+  if (!sess) { toast("Sandbox không còn RUNNING", "err"); return; }
+  if (!command || S.execBusy) return;
+  if (H.list[H.list.length - 1] !== command) H.list.push(command);
+  H.idx = H.list.length;
+  const body = { command, cwd: $("exec-cwd").value.trim() };
+  const t = parseInt($("exec-timeout").value, 10); if (t > 0) body.timeout_seconds = t;
+  S.execBusy = true; $("btn-exec").disabled = true; $("exec-status").textContent = "đang chạy…";
+  const out = $("exec-out"); if (out.firstChild && out.firstChild.className === "meta" && out.childNodes.length === 1) clear(out);
+  term((out.childNodes.length ? "\n" : "") + "$ " + command + "\n", "cmd");
+  const started = performance.now();
+  try {
+    const res = await fetch("/admin/api/sessions/" + encodeURIComponent(sess.session_id) + "/exec", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok || !res.body) { let msg = "HTTP " + res.status; try { const j = await res.json(); msg = (j.error && j.error.message) || JSON.stringify(j.detail || j); } catch (_) {} throw new Error(msg); }
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "output") term(ev.text, ev.stream === "stderr" ? "err" : null);
+        else if (ev.type === "result") {
+          const parts = ["exit " + ev.exit_code, ev.duration_ms + " ms"];
+          if (ev.timed_out) parts.push("HẾT GIỜ — đã kill");
+          if (ev.truncated) parts.push("output bị cắt (giữ 1MB cuối)");
+          if (ev.error_detail) parts.push(ev.error_detail);
+          term("\n[" + parts.join(" · ") + "]\n", ev.exit_code === 0 && !ev.timed_out ? "meta" : "err");
+          $("exec-status").textContent = "exit " + ev.exit_code + " · " + ev.duration_ms + " ms";
+        } else if (ev.type === "error") {
+          term("[" + ev.error.code + "] " + ev.error.message + "\n", "err");
+          $("exec-status").textContent = "lỗi";
+        }
+      }
+    }
+  } catch (e) { term("[lỗi] " + e.message + "\n", "err"); $("exec-status").textContent = "lỗi"; }
+  finally {
+    S.execBusy = false; $("btn-exec").disabled = false;
+    if ($("exec-status").textContent === "đang chạy…") $("exec-status").textContent = Math.round(performance.now() - started) + " ms";
+    $("exec-cmd").focus();
+  }
+}
+for (const p of PRESETS) { const b = el("button", "btn sm", p.length > 22 ? p.slice(0, 20) + "…" : p); b.title = p; b.onclick = () => { $("exec-cmd").value = p; runCommand(); }; $("exec-presets").appendChild(b); }
+$("btn-exec").onclick = runCommand;
+$("btn-exec-clear").onclick = () => clear($("exec-out"));
+$("exec-cmd").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); runCommand(); }
+  else if (e.key === "ArrowUp" && H.list.length) { e.preventDefault(); H.idx = Math.max(0, H.idx - 1); $("exec-cmd").value = H.list[H.idx]; }
+  else if (e.key === "ArrowDown" && H.list.length) { e.preventDefault(); H.idx = Math.min(H.list.length, H.idx + 1); $("exec-cmd").value = H.list[H.idx] || ""; }
+});
 
 $("btn-reload").onclick = load;
 $("btn-logs").onclick = loadLogs;
