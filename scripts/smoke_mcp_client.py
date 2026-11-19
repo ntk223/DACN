@@ -101,13 +101,13 @@ async def main(url: str) -> int:
             }))
             _step(read_2.get("content") == content_2, "file_read sau edit → '# đã sửa'")
 
-            # 7. file_write vào node_modules force=False → bị chặn (guard ignore)
+            # 7. file_write vào node_modules → bị chặn (không lưu thư viện phụ thuộc)
             blocked = _payload(await session.call_tool("file_write", {
                 "session_id": session_id, "path": "node_modules/x.js", "content": "console.log(1)\n",
             }))
             err = blocked.get("error") or {}
             _step(err.get("code") == "ignored_path",
-                  f"file_write node_modules (không force) → bị chặn: {err.get('code')}")
+                  f"file_write node_modules → không lưu: {err.get('code')}")
 
             # 8. sandbox lifecycle: start → status → stop
             started = _payload(await session.call_tool("sandbox_start", {

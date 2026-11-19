@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from mcp.server.fastmcp import FastMCP
 
 from sandbox_kit_clone import __version__
@@ -20,12 +21,18 @@ from sandbox_kit_clone.gateway import (
     install_error_handlers,
     upload_router,
 )
+from sandbox_kit_clone.gateway.admin_api import admin_api_router
 from sandbox_kit_clone.gateway.mcp_server import register_tools
 from sandbox_kit_clone.manager.manager import Manager
 from sandbox_kit_clone.providers.fake import FakeProvider
 
 # Tên MCP server hiển thị cho client (Inspector / Claude Code...).
 MCP_SERVER_NAME = "sandbox-kit-clone"
+
+# Trang admin UI (dev tool): file HTML tĩnh nằm cạnh module này.
+ADMIN_HTML_PATH = Path(__file__).parent / "admin.html"
+# Trang quản lý VFS (dev tool): duyệt/sửa file, lịch sử, dấu xóa, thử thuật toán.
+VFS_HTML_PATH = Path(__file__).parent / "vfs.html"
 
 
 def create_app(
@@ -63,8 +70,19 @@ def create_app(
         """Kiểm tra sống: app chạy + phiên bản."""
         return {"status": "ok", "version": __version__}
 
+    @app.get("/admin", include_in_schema=False)
+    def admin() -> HTMLResponse:
+        """Bảng điều khiển test API (dev tool) — trang HTML tĩnh."""
+        return HTMLResponse(ADMIN_HTML_PATH.read_text(encoding="utf-8"))
+
+    @app.get("/admin/vfs", include_in_schema=False)
+    def admin_vfs() -> HTMLResponse:
+        """Trang quản lý VFS (dev tool) — dùng REST ``/admin/api/*``."""
+        return HTMLResponse(VFS_HTML_PATH.read_text(encoding="utf-8"))
+
     app.include_router(upload_router)
     app.include_router(download_router)
+    app.include_router(admin_api_router)
     install_error_handlers(app)
     app.mount("/mcp", mcp.streamable_http_app())
     return app

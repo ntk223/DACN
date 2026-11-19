@@ -343,33 +343,43 @@ def test_quota_exceeded(tmp_path):
         vfs.close()
 
 
-# ------------------------------------------------------- 6. ignore 3 tầng (C2, nguyên tắc 4)
+# ------------------------------------- 6. không lưu thư viện / môi trường / cache / build
 
 
-def test_ignore_tier1_block_and_force_freeze_warning(make_vfs):
+@pytest.mark.parametrize(
+    "path",
+    [
+        "node_modules/pkg/index.js",
+        "web/node_modules/react/index.js",   # lồng sâu
+        ".venv/lib/python3.12/site.py",
+        "venv/bin/activate",
+        "src/__pycache__/app.cpython-312.pyc",
+        ".git/config",
+        "dist/bundle.js",
+        "build/lib/x.py",
+        "mypkg.egg-info/PKG-INFO",
+        "src/app.pyc",
+        "Main.class",
+        "src/.DS_Store",
+        ".coverage",
+    ],
+)
+def test_dependency_and_build_paths_not_stored(make_vfs, path):
     vfs = make_vfs()
-    for path in ("node_modules/pkg/index.js", ".git/config"):
-        with pytest.raises(AppError) as exc_info:
-            vfs.write_file(path, "noi dung")
-        assert exc_info.value.code is ErrorCode.ignored_path
-        assert path in exc_info.value.message
-        assert "force" in exc_info.value.message  # gợi ý force=true
-
-        result = vfs.write_file(path, "noi dung", force=True)
-        assert result["warnings"]
-        assert any("đóng băng" in warning for warning in result["warnings"])
-
-    # Path thường → không warning.
-    assert vfs.write_file("src/app.py", "print()")["warnings"] == []
-
-
-def test_tier3_tmp_scratch_forbidden(make_vfs):
-    vfs = make_vfs()
-    for path in ("tmp/thing.txt", "scratch/x"):
-        with pytest.raises(AppError) as exc_info:
-            vfs.write_file(path, "data", force=True)  # kể cả force=True
-        assert exc_info.value.code is ErrorCode.forbidden_path
+    with pytest.raises(AppError) as exc_info:
+        vfs.write_file(path, "noi dung")
+    assert exc_info.value.code is ErrorCode.ignored_path
     assert vfs.list_files() == []
+
+
+def test_source_paths_are_stored(make_vfs):
+    """Không còn tầng 3 / force: tmp/, scratch/ và tên gần giống vẫn là mã nguồn bình thường."""
+    vfs = make_vfs()
+    for path in ("src/app.py", "tmp/notes.md", "scratch/x.txt", "src/builder.py", "docs/dist.md",
+                 ".github/workflows/ci.yml", ".gitignore", "requirements.txt", "package.json"):
+        result = vfs.write_file(path, "x")
+        assert "warnings" not in result
+    assert len(vfs.list_files()) == 9
 
 
 # ------------------------------------------------------------- 7. chuẩn hóa đường dẫn

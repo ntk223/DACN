@@ -42,12 +42,15 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
     # ------------------------------------------------------------- workspace
 
     @mcp.tool()
-    def workspace_create(name: str = "") -> dict:
+    def workspace_create(name: str = "", conflict_policy: str = "sandbox_wins") -> dict:
         """Tạo workspace + phiên làm việc mới; sinh mã tự động.
 
-        Trả về workspace_id + session_id — agent giữ session_id cho mọi tool sau.
+        conflict_policy — chính sách xử lý xung đột khi hai phía cùng sửa một file (W3 dùng):
+        'sandbox_wins' = nội dung từ sandbox được nhận về đè bản của agent (kèm cảnh báo);
+        'error' = dừng tại file xung đột, giữ nguyên bản của agent. Sai giá trị → invalid_request.
+        Trả về workspace_id + session_id + conflict_policy + created_at — agent giữ session_id cho mọi tool sau.
         """
-        return _safe(lambda: manager.create_workspace(name))
+        return _safe(lambda: manager.create_workspace(name, conflict_policy))
 
     tools["workspace_create"] = workspace_create
 
@@ -103,14 +106,14 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
     # ----------------------------------------------------------------- files
 
     @mcp.tool()
-    def file_write(session_id: str, path: str, content: str, force: bool = False) -> dict:
+    def file_write(session_id: str, path: str, content: str) -> dict:
         """Ghi (tạo mới hoặc đè) file vào kho của phiên.
 
         File lớn hơn ~3MB KHÔNG đi qua tool này — trả kèm upload_hint, dùng đường
-        upload theo phần (POST /upload). force=true ghi đè vào thư mục ignore
-        (node_modules...) — file sẽ bị 'đóng băng' với đồng bộ W3.
+        upload theo phần (POST /upload). Kho chỉ lưu mã nguồn dự án: đường dẫn thư viện /
+        môi trường / cache / build (node_modules, .venv, dist, __pycache__...) → ignored_path.
         """
-        return _safe(lambda: _file_write(manager, session_id, path, content, force))
+        return _safe(lambda: _file_write(manager, session_id, path, content))
 
     tools["file_write"] = file_write
 
@@ -122,14 +125,12 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
     tools["file_read"] = file_read
 
     @mcp.tool()
-    def file_edit(
-        session_id: str, path: str, old_text: str, new_text: str, force: bool = False
-    ) -> dict:
+    def file_edit(session_id: str, path: str, old_text: str, new_text: str) -> dict:
         """Sửa file bằng thay thế old_text → new_text (khớp chính xác rồi khớp mờ).
 
         Trả về used_fuzzy=True khi đã dùng khớp mờ (chấp nhận lệch khoảng trắng).
         """
-        return _safe(lambda: _file_edit(manager, session_id, path, old_text, new_text, force))
+        return _safe(lambda: _file_edit(manager, session_id, path, old_text, new_text))
 
     tools["file_edit"] = file_edit
 
@@ -162,7 +163,7 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
 # ------------------------------------------------------- hiện thực tool file
 
 
-def _file_write(manager: Manager, session_id: str, path: str, content: str, force: bool) -> dict:
+def _file_write(manager: Manager, session_id: str, path: str, content: str) -> dict:
     _, vfs = manager.resolve_session(session_id)
     data = content.encode("utf-8")
     if len(data) > manager.settings.inline_max_bytes:
@@ -178,7 +179,7 @@ def _file_write(manager: Manager, session_id: str, path: str, content: str, forc
                 "upload_hint": True,
             }
         }
-    return vfs.write_file(path, data, force=force)
+    return vfs.write_file(path, data)
 
 
 def _file_read(manager: Manager, session_id: str, path: str) -> dict:
@@ -211,10 +212,10 @@ def _file_read(manager: Manager, session_id: str, path: str) -> dict:
 
 
 def _file_edit(
-    manager: Manager, session_id: str, path: str, old_text: str, new_text: str, force: bool
+    manager: Manager, session_id: str, path: str, old_text: str, new_text: str
 ) -> dict:
     _, vfs = manager.resolve_session(session_id)
-    return vfs.edit_file(path, old_text, new_text, force=force)
+    return vfs.edit_file(path, old_text, new_text)
 
 
 def _file_delete(manager: Manager, session_id: str, path: str) -> dict:

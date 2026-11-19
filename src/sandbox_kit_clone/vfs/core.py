@@ -20,7 +20,7 @@ from sandbox_kit_clone.config import Settings
 from sandbox_kit_clone.errors import AppError, ErrorCode
 from sandbox_kit_clone.vfs.blob import BlobStore
 from sandbox_kit_clone.vfs.fuzzy import fuzzy_replace
-from sandbox_kit_clone.vfs.ignore import check_write_allowed
+from sandbox_kit_clone.vfs.ignore import ensure_storable
 from sandbox_kit_clone.vfs.paths import canonicalize_path
 from sandbox_kit_clone.vfs.quota import check_quota, used_bytes
 from sandbox_kit_clone.vfs.schema import init_workspace_db
@@ -88,20 +88,21 @@ class VFS:
 
     # ------------------------------------------------------------------- writes
 
-    def write_file(self, path: str, content: bytes | str, force: bool = False) -> dict:
+    def write_file(self, path: str, content: bytes | str) -> dict:
         """Ghi (tạo mới hoặc đè) file vào kho; trả metadata kết quả.
 
         Cùng nội dung (same-sha) → no-op: không bump revision, không ghi history.
+        Đường dẫn thư viện / build / cache → ``ignored_path`` (không lưu).
         """
         canonical = canonicalize_path(path)
         data = content.encode("utf-8") if isinstance(content, str) else bytes(content)
-        warnings = check_write_allowed(canonical, force)
-        return self._write(canonical, data, warnings)
+        ensure_storable(canonical)
+        return self._write(canonical, data)
 
-    def edit_file(self, path: str, old_text: str, new_text: str, force: bool = False) -> dict:
+    def edit_file(self, path: str, old_text: str, new_text: str) -> dict:
         """Sửa file bằng fuzzy replace; đi cùng pipeline ghi như ``write_file``."""
         canonical = canonicalize_path(path)
-        warnings = check_write_allowed(canonical, force)
+        ensure_storable(canonical)
         data = self.read_file(canonical)
         try:
             text = data.decode("utf-8")
@@ -111,17 +112,16 @@ class VFS:
                 f"File không phải văn bản UTF-8, không edit được: '{canonical}'",
             ) from exc
         replaced, used_fuzzy = fuzzy_replace(text, old_text, new_text)
-        result = self._write(canonical, replaced.encode("utf-8"), warnings)
+        result = self._write(canonical, replaced.encode("utf-8"))
         return {
             "path": result["path"],
             "rev": result["rev"],
             "sha256": result["sha256"],
             "size": result["size"],
             "used_fuzzy": used_fuzzy,
-            "warnings": result["warnings"],
         }
 
-    def import_blob(self, path: str, sha256: str, size: int, force: bool = False) -> dict:
+    def import_blob(self, path: str, sha256: str, size: int) -> dict:
         """Ghi row file lớn lưu rời (sidecar) — gọi bởi chunked upload complete (W1.4).
 
         Sidecar ĐÃ được ghi qua ``BlobStore.write_stream`` (đã verify sha) TRƯỚC
@@ -130,7 +130,7 @@ class VFS:
         ``_write``. ``is_binary`` đặt 0 vì chưa đọc nội dung.
         """
         canonical = canonicalize_path(path)
-        warnings = check_write_allowed(canonical, force)
+        ensure_storable(canonical)
         if not isinstance(size, int) or size < 0:
             raise AppError(ErrorCode.invalid_request, f"size không hợp lệ: {size!r}")
         with self._lock:
@@ -172,7 +172,6 @@ class VFS:
                 "sha256": sha256,
                 "size": size,
                 "storage_class": "blob",
-                "warnings": warnings,
             }
 
     def delete_file(self, path: str, origin: str = "vfs") -> dict:
@@ -272,7 +271,7 @@ class VFS:
 
     # ---------------------------------------------------------------- internals
 
-    def _write(self, path: str, data: bytes, warnings: list[str]) -> dict:
+    def _write(self, path: str, data: bytes) -> dict:
         """Pipeline ghi dùng chung cho write_file + edit_file (đường dẫn đã chuẩn).
 
         Trình tự: same-sha no-op (C5) → quota (C1) → lưu sidecar nếu ≥ ngưỡng →
@@ -331,7 +330,6 @@ class VFS:
                 "sha256": sha,
                 "size": size,
                 "storage_class": storage_class,
-                "warnings": warnings,
             }
 
     def _store_sidecar(self, data: bytes) -> str:
@@ -416,7 +414,6 @@ class VFS:
             "size": row["size"],
             "storage_class": row["storage_class"],
             "noop": True,
-            "warnings": [],
         }
 
     def _safe_rollback(self) -> None:

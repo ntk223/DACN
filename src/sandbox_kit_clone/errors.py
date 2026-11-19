@@ -12,7 +12,6 @@ class ErrorCode(str, Enum):
     session_not_found = "session_not_found"
     file_not_found = "file_not_found"
     ignored_path = "ignored_path"
-    forbidden_path = "forbidden_path"
     quota_exceeded = "quota_exceeded"
     invalid_path = "invalid_path"
     invalid_request = "invalid_request"

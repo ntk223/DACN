@@ -1,68 +1,69 @@
-"""Quy tắc bỏ qua thư viện phụ thuộc — tầng 1 (tên ignore) + tầng 2 (ghi đè có chủ ý).
+"""Quy tắc KHÔNG LƯU — kho chỉ giữ mã nguồn mà dự án sẽ đẩy lên GitHub.
 
-Bám ``docs/system-design.md`` §7.8 (C2):
-  - Tầng 1: các đường nạp tự động (từ sandbox, quét Git) chặn cứng tên ignore.
-  - Tầng 2: agent ghi qua tool vào path ignore → chặn mặc định, cho phép khi
-    ``force=true`` — nhưng bắt buộc kèm cảnh báo "đóng băng".
-  - Tầng 3 (``tmp``/``scratch``): xử lý ở ``paths.py`` — chặn tuyệt đối.
+Thư viện phụ thuộc, môi trường ảo, cache và sản phẩm build (những thứ thường nằm trong
+``.gitignore``) không bao giờ vào kho: ghi vào các đường dẫn này → ``ignored_path``.
+Một quy tắc duy nhất, không có ngoại lệ ``force`` (thay cho mô hình 3 tầng C2 của thiết kế).
 """
 
 from __future__ import annotations
 
 from sandbox_kit_clone.errors import AppError, ErrorCode
 
-# Tầng 1: thư mục không bao giờ vào kho lưu trữ qua đường tự động.
+# Thư mục: khớp BẤT KỲ segment nào của đường dẫn.
 IGNORED_DIR_NAMES: frozenset[str] = frozenset(
     {
-        "node_modules",
-        ".venv",
-        "venv",
-        "__pycache__",
-        ".pytest_cache",
-        "dist",
-        "build",
-        ".cache",
+        # thư viện phụ thuộc
+        "node_modules", "bower_components", "jspm_packages",
+        # môi trường ảo Python
+        ".venv", "venv",
+        # cache công cụ
+        "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".nox",
+        ".cache", ".parcel-cache", ".eggs",
+        # sản phẩm build
+        "dist", "build", ".next", ".nuxt", ".gradle", "htmlcov",
+        # metadata VCS
         ".git",
     }
 )
 
-# Tệp rác hệ điều hành — bỏ theo tên file (basename cuối).
-IGNORED_FILE_NAMES: frozenset[str] = frozenset({".DS_Store"})
+# Thư mục kết thúc bằng hậu tố này (vd ``mypkg.egg-info``).
+IGNORED_DIR_SUFFIXES: tuple[str, ...] = (".egg-info",)
 
-_FREEZE_WARNING = (
-    "File '{path}' nằm trong thư mục bị bỏ qua (ignore). File ghi kiểu 'cho phép đè'"
-    " (force=true) sẽ bị 'đóng băng': các sửa đổi từ sandbox về sau KHÔNG được nhận về"
-    " kho lưu trữ nữa (pull-back bỏ qua mọi file ignored)."
-)
+# Tên file cụ thể (basename).
+IGNORED_FILE_NAMES: frozenset[str] = frozenset({".DS_Store", "Thumbs.db", ".coverage"})
+
+# Đuôi file biên dịch.
+IGNORED_FILE_SUFFIXES: tuple[str, ...] = (".pyc", ".pyo", ".class", ".o")
+
+
+def ignore_reason(path: str) -> str | None:
+    """Lý do ``path`` (đã canonicalize) không được lưu; ``None`` nếu được lưu."""
+    *dirs, name = path.split("/")
+    for segment in dirs:
+        if segment in IGNORED_DIR_NAMES:
+            return f"thư mục '{segment}/'"
+        if segment.endswith(IGNORED_DIR_SUFFIXES):
+            return f"thư mục '{segment}/'"
+    if name in IGNORED_DIR_NAMES:  # chính đường dẫn là thư mục bị bỏ qua (vd ghi file tên '.git')
+        return f"tên '{name}'"
+    if name in IGNORED_FILE_NAMES:
+        return f"file '{name}'"
+    if name.endswith(IGNORED_FILE_SUFFIXES):
+        return f"đuôi '{name[name.rfind('.'):]}'"
+    return None
 
 
 def is_ignored(path: str) -> bool:
-    """True nếu ``path`` (đã canonicalize) chạm vùng ignore.
-
-    Kiểm BẤT KỲ segment nào thuộc ``IGNORED_DIR_NAMES``, hoặc basename cuối
-    thuộc ``IGNORED_FILE_NAMES``.
-    """
-    segments = path.split("/")
-    if any(segment in IGNORED_DIR_NAMES for segment in segments):
-        return True
-    return segments[-1] in IGNORED_FILE_NAMES
+    """True nếu ``path`` (đã canonicalize) thuộc vùng không lưu."""
+    return ignore_reason(path) is not None
 
 
-def check_write_allowed(path: str, force: bool) -> list[str]:
-    """Tầng 2 — MCP write tới path ignore.
-
-    - Không ignore → trả ``[]``.
-    - Ignore + ``force=False`` → ``AppError(ignored_path)`` (message nêu path
-      và gợi ý ``force=true``).
-    - Ignore + ``force=True`` → cho phép, trả danh sách warnings bắt buộc chứa
-      cảnh báo "đóng băng" (file sẽ không nhận sửa đổi từ sandbox về sau).
-    """
-    if not is_ignored(path):
-        return []
-    if not force:
+def ensure_storable(path: str) -> None:
+    """Chặn ghi vào vùng không lưu → ``AppError(ignored_path)``; ngược lại không làm gì."""
+    reason = ignore_reason(path)
+    if reason is not None:
         raise AppError(
             ErrorCode.ignored_path,
-            f"Đường dẫn '{path}' nằm trong thư mục bị bỏ qua (ignore). Ghi mặc định bị"
-            " chặn — dùng force=true nếu thật sự muốn ghi đè (file sẽ bị 'đóng băng').",
+            f"Không lưu '{path}': {reason} là thư viện / môi trường / cache / build"
+            " — kho chỉ giữ mã nguồn mà dự án đẩy lên GitHub.",
         )
-    return [_FREEZE_WARNING.format(path=path)]

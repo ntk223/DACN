@@ -21,7 +21,11 @@ from sandbox_kit_clone.errors import AppError, ErrorCode
 from sandbox_kit_clone.providers.base import SandboxProvider
 from sandbox_kit_clone.system.store import SystemStore
 from sandbox_kit_clone.vfs.core import VFS
-from sandbox_kit_clone.vfs.schema import init_workspace_db
+from sandbox_kit_clone.vfs.schema import (
+    DEFAULT_CONFLICT_POLICY,
+    init_workspace_db,
+    validate_conflict_policy,
+)
 
 # Image mặc định cho PoC (W2 sẽ thay bằng image thật theo cấu hình).
 DEFAULT_SANDBOX_IMAGE = "poc/python-toolchain"
@@ -58,13 +62,21 @@ class Manager:
 
     # ------------------------------------------------------------- workspace
 
-    def create_workspace(self, name: str = "") -> dict:
-        """Tạo workspace + session STANDBY; trả ``{workspace_id, session_id, name}``."""
+    def create_workspace(
+        self, name: str = "", conflict_policy: str = DEFAULT_CONFLICT_POLICY
+    ) -> dict:
+        """Tạo workspace + session STANDBY; trả ``{workspace_id, session_id, name, conflict_policy, created_at}``.
+
+        ``conflict_policy`` kiểm qua ``validate_conflict_policy`` (một điểm duy nhất —
+        thêm chính sách mới không phải sửa Manager); lỗi đầu vào KHÔNG ghi sổ operations.
+        """
+        # Validate TRƯỚC khi ghi sổ: request sai định dạng không tạo dòng sổ rác.
+        policy = validate_conflict_policy(conflict_policy)
         last_exc: Exception | None = None
         for _ in range(_CREATE_WORKSPACE_RETRIES):
             workspace_id = uuid.uuid4().hex[:12]
             try:
-                return self._create_workspace_once(workspace_id, name)
+                return self._create_workspace_once(workspace_id, name, policy)
             except AppError as exc:
                 if exc.code is not ErrorCode.conflict:
                     raise
@@ -74,15 +86,27 @@ class Manager:
             f"Tạo workspace thất bại sau {_CREATE_WORKSPACE_RETRIES} lần thử (id trùng)",
         ) from last_exc
 
-    def _create_workspace_once(self, workspace_id: str, name: str) -> dict:
+    def _create_workspace_once(self, workspace_id: str, name: str, policy: str) -> dict:
         session_id = uuid.uuid4().hex
 
         def _do() -> dict:
-            # init_workspace_db idempotent; trả conn — đóng ngay, VFS mở riêng mỗi lần đọc.
-            init_workspace_db(self.workspace_db_path(workspace_id)).close()
+            # init_workspace_db idempotent; trả conn — ghi chính sách vào workspace_meta
+            # (đúng seed của thiết kế) rồi đóng; VFS mở riêng mỗi lần đọc.
+            conn = init_workspace_db(self.workspace_db_path(workspace_id))
+            conn.execute(
+                "UPDATE workspace_meta SET conflict_policy = ? WHERE id = 1", (policy,)
+            )
+            conn.commit()
+            conn.close()
             self.store.create_workspace(workspace_id, status="active")
             self.store.create_session(session_id, workspace_id, state="STANDBY")
-            return {"workspace_id": workspace_id, "session_id": session_id, "name": name or None}
+            return {
+                "workspace_id": workspace_id,
+                "session_id": session_id,
+                "name": name or None,
+                "conflict_policy": policy,
+                "created_at": _utcnow_iso(),
+            }
 
         return self._op("workspace_create", workspace_id, None, _do)
 

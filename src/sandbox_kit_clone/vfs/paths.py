@@ -2,7 +2,7 @@
 
 Mọi đường dẫn đi vào kho file (write/edit/read/delete/list) phải đi qua
 ``canonicalize_path``: hệ thống chỉ lưu path posix tương đối, NFC, không cho
-phép escape root và chặn tuyệt đối thư mục tạm tầng 3 (``tmp``/``scratch``).
+phép escape root. Quy tắc "không lưu" (thư viện, build...) nằm ở ``ignore.py``.
 """
 
 from __future__ import annotations
@@ -15,10 +15,6 @@ from sandbox_kit_clone.errors import AppError, ErrorCode
 
 # Độ dài tối đa của một đường dẫn hợp lệ (khớp giới hạn PATH_MAX của Linux).
 MAX_PATH_LENGTH = 4096
-
-# Tầng 3 ignore (C2): thư mục tạm CHỈ nằm trong RAM của sandbox, không bao giờ
-# vào VFS — kể cả khi caller dùng force=true.
-TIER3_DIR_NAMES = frozenset({"tmp", "scratch"})
 
 # Drive letter kiểu Windows (``C:/...``) — được cắt bỏ khi ép về tương đối.
 _DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
@@ -37,8 +33,6 @@ def canonicalize_path(raw: str) -> str:
          (cắt drive letter + leading ``/``), rồi ``posixpath.normpath``.
       3. Reject kết quả rỗng, là ``.``/``..``, chứa segment ``..``, hoặc bắt
          đầu bằng ``/`` sau normalize (escape root) → ``invalid_path``.
-      4. Chặn tuyệt đối segment đầu là ``tmp``/``scratch`` (tầng 3) →
-         ``forbidden_path``.
     """
     if not isinstance(raw, str) or raw.strip() == "":
         raise _invalid("rỗng hoặc chỉ toàn khoảng trắng")
@@ -57,10 +51,4 @@ def canonicalize_path(raw: str) -> str:
     segments = candidate.split("/")
     if any(segment == ".." for segment in segments):
         raise _invalid(f"chứa thành phần '..': {raw!r}")
-    if segments[0] in TIER3_DIR_NAMES:
-        raise AppError(
-            ErrorCode.forbidden_path,
-            f"Thư mục tạm '{segments[0]}/' chỉ nằm trong RAM của sandbox, không bao giờ"
-            f" vào kho lưu trữ (kể cả force=true): {candidate!r}",
-        )
     return candidate

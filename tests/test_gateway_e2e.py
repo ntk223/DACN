@@ -94,7 +94,7 @@ def test_download_missing_file_is_404(client: TestClient) -> None:
 # ---------------------------------------------------- 2. Tool MCP gọi trực tiếp
 
 
-def test_tool_file_lifecycle_with_fuzzy_and_force(tmp_path: Path) -> None:
+def test_tool_file_lifecycle_with_fuzzy_and_ignore(tmp_path: Path) -> None:
     app = _app(tmp_path)
     tools = app.state.tool_fns
     created = tools["workspace_create"](name="tool-level")
@@ -115,13 +115,11 @@ def test_tool_file_lifecycle_with_fuzzy_and_force(tmp_path: Path) -> None:
     )
     assert edited["used_fuzzy"] is True
 
-    # force node_modules: không force → lỗi ignored_path; có force → cảnh báo 'đóng băng'
+    # thư viện phụ thuộc không được lưu (không có ngoại lệ force)
     blocked = tools["file_write"](session_id=session_id, path="node_modules/x.js", content="x")
     assert blocked["error"]["code"] == "ignored_path"
-    forced = tools["file_write"](
-        session_id=session_id, path="node_modules/x.js", content="x", force=True
-    )
-    assert any("đóng băng" in w for w in forced["warnings"])
+    listed = tools["file_list"](session_id=session_id)["files"]
+    assert [f["path"] for f in listed] == ["src/app.py"]
 
     # file không tồn tại → payload lỗi chuẩn
     missing = tools["file_read"](session_id=session_id, path="nope.txt")
@@ -130,9 +128,8 @@ def test_tool_file_lifecycle_with_fuzzy_and_force(tmp_path: Path) -> None:
     assert err_session["error"]["code"] == "session_not_found"
 
     # file_delete → file_list rỗng; sync_status có revision
-    deleted = tools["file_delete"](session_id=session_id, path="node_modules/x.js")
+    deleted = tools["file_delete"](session_id=session_id, path="src/app.py")
     assert deleted["origin"] == "vfs"
-    tools["file_delete"](session_id=session_id, path="src/app.py")
     listing = tools["file_list"](session_id=session_id)
     assert listing["files"] == []
     synced = tools["sync_status"](session_id=session_id)
@@ -233,3 +230,34 @@ async def _mcp_transport_flow(tmp_path: Path) -> None:
 def test_mcp_transport_over_real_http(tmp_path: Path) -> None:
     """Chứng minh protocol thật: server uvicorn nền + client SDK MCP qua streamable-http."""
     asyncio.run(_mcp_transport_flow(tmp_path))
+
+
+# --------------------------------------------- nghiệp vụ create_workspace (chốt 5 điểm)
+
+
+def test_workspace_create_output_full(tmp_path: Path) -> None:
+    """Đầu ra đầy đủ: conflict_policy + created_at; policy ghi đúng vào workspace_meta."""
+    import sqlite3
+
+    app = _app(tmp_path)
+    tools = app.state.tool_fns
+    ws = tools["workspace_create"](name="nghiệp-vụ")
+    assert ws["conflict_policy"] == "sandbox_wins"
+    assert ws["created_at"] and "T" in ws["created_at"]  # ISO UTC
+    db = tmp_path / "data" / "workspaces" / f"{ws['workspace_id']}.sqlite"
+    row = sqlite3.connect(db).execute(
+        "SELECT conflict_policy FROM workspace_meta WHERE id = 1"
+    ).fetchone()
+    assert row[0] == "sandbox_wins"
+
+
+def test_workspace_create_policy_error_ok(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    ws = app.state.tool_fns["workspace_create"](name="", conflict_policy="error")
+    assert ws["conflict_policy"] == "error"
+
+
+def test_workspace_create_policy_invalid(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    ws = app.state.tool_fns["workspace_create"](conflict_policy="hero_wins")
+    assert ws["error"]["code"] == "invalid_request"

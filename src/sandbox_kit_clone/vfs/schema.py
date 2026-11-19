@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from sandbox_kit_clone.errors import AppError, ErrorCode
+
 # SQL khởi tạo database dự án — giữ nguyên khối SQL của system-design.md §6.2.
 # Chỉ thêm `IF NOT EXISTS` để init chạy lại không lỗi, không mất dữ liệu.
 WORKSPACE_SCHEMA = """\
@@ -74,3 +76,25 @@ def init_workspace_db(path: Path) -> sqlite3.Connection:
     conn.execute("INSERT OR IGNORE INTO git_meta (id) VALUES (1)")
     conn.commit()
     return conn
+
+
+# --------------------------------------------------------- chính sách xung đột
+# Điểm mở rộng tập trung: thêm chính sách mới chỉ cần bổ sung vào set dưới đây.
+
+DEFAULT_CONFLICT_POLICY = "sandbox_wins"
+VALID_CONFLICT_POLICIES: frozenset[str] = frozenset({"sandbox_wins", "error"})
+
+
+def validate_conflict_policy(policy: str) -> str:
+    """Chuẩn hóa + kiểm chính sách xung đột (điểm kiểm tra DUY NHẤT của hệ thống).
+
+    Trả về giá trị chuẩn hóa; sai giá trị → ``AppError(invalid_request)``.
+    W3 sẽ đọc cột này khi phân loại xung đột ở bước nhận về (pull-back).
+    """
+    value = (policy or "").strip().lower()
+    if value not in VALID_CONFLICT_POLICIES:
+        raise AppError(
+            ErrorCode.invalid_request,
+            f"conflict_policy chỉ nhận {sorted(VALID_CONFLICT_POLICIES)} — nhận được: {policy!r}",
+        )
+    return value

@@ -121,9 +121,11 @@ def init_upload(payload: UploadInit, request: Request) -> dict:
         conn.close()
 
     # Canonicalize sớm: sai đường dẫn → chặn trước khi client mất công truyền file.
+    from sandbox_kit_clone.vfs.ignore import ensure_storable
     from sandbox_kit_clone.vfs.paths import canonicalize_path
 
     path = canonicalize_path(payload.path)
+    ensure_storable(path)  # thư viện / build → chặn trước khi client truyền dữ liệu
 
     token = uuid.uuid4().hex
     staging_root(settings).joinpath(token).mkdir(parents=True, exist_ok=False)
