@@ -13,6 +13,15 @@ from functools import lru_cache
 ENV_PREFIX = "SANDBOX_KIT_"
 
 _VALID_POLICY_MODES = ("audit", "enforce")
+_VALID_PROVIDERS = ("fake", "docker")
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Đọc bool từ env (1/true/yes/on); thiếu hoặc rỗng → ``default``."""
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
 
 
 def _env_str(name: str, default: str) -> str:
@@ -48,12 +57,19 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8000
     api_key: str = ""                          # "" = no-auth
+    provider: str = "fake"                     # fake | docker
+    sandbox_image: str = "sandbox-kit/sandbox:w2"  # image sandbox (make image)
+    sandbox_network: bool = True               # False → container không ra mạng
 
     def __post_init__(self) -> None:
         if self.policy_mode not in _VALID_POLICY_MODES:
             raise ValueError(
                 f"policy_mode phải là một trong {_VALID_POLICY_MODES}, "
                 f"nhận được: {self.policy_mode!r}"
+            )
+        if self.provider not in _VALID_PROVIDERS:
+            raise ValueError(
+                f"provider phải là một trong {_VALID_PROVIDERS}, nhận được: {self.provider!r}"
             )
 
 
@@ -70,4 +86,7 @@ def get_settings() -> Settings:
         host=_env_str(f"{ENV_PREFIX}HOST", "127.0.0.1"),
         port=_env_int(f"{ENV_PREFIX}PORT", 8000),
         api_key=_env_str(f"{ENV_PREFIX}API_KEY", ""),
+        provider=_env_str(f"{ENV_PREFIX}PROVIDER", "fake"),
+        sandbox_image=_env_str(f"{ENV_PREFIX}SANDBOX_IMAGE", "sandbox-kit/sandbox:w2"),
+        sandbox_network=_env_bool(f"{ENV_PREFIX}SANDBOX_NETWORK", True),
     )

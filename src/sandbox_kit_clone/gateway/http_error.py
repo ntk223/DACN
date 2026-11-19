@@ -16,6 +16,7 @@ _STATUS_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.workspace_not_found: 404,
     ErrorCode.conflict: 409,
     ErrorCode.quota_exceeded: 413,
+    ErrorCode.provider_unavailable: 503,
 }
 
 _HTTP_STATUS_KEY = "http_status"

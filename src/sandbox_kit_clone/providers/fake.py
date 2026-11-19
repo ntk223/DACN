@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import ClassVar
 
 from sandbox_kit_clone.errors import AppError, ErrorCode
 from sandbox_kit_clone.providers.base import SandboxProvider
@@ -40,6 +41,14 @@ class _FakeSandbox:
 
 class FakeProvider(SandboxProvider):
     """Hiện thực in-memory của ``SandboxProvider`` — đủ dùng cho toàn bộ tool surface W1."""
+
+    name = "fake"
+    capabilities: ClassVar[dict] = {
+        "pause_resume": True,
+        "metrics": False,
+        "diagnostics": False,
+        "isolation_tiers": ["runc"],
+    }
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = base_dir if base_dir is not None else DEFAULT_BASE_DIR
@@ -141,6 +150,46 @@ class FakeProvider(SandboxProvider):
         if sandbox.expires_at is None:
             return False
         return sandbox.expires_at <= (now if now is not None else _utc_now())
+
+    def get_expiry(self, sandbox_id: str) -> datetime | None:
+        return self._get_or_raise(sandbox_id).expires_at
+
+    def describe_sandbox(self, sandbox_id: str) -> dict:
+        """Thông tin gọn cho trang quản trị — cùng khóa với ``DockerProvider``."""
+        sandbox = self._get_or_raise(sandbox_id)
+        return {
+            "sandbox_id": sandbox_id,
+            "session_id": sandbox.session_id,
+            "state": sandbox.state,
+            "image": sandbox.image,
+            "created_at": sandbox.created_at,
+            "expires_at": sandbox.expires_at.isoformat() if sandbox.expires_at else None,
+            "dial_target": f"127.0.0.1:{sandbox.dial_port}",
+            "volume": str(sandbox.volume_path) if sandbox.volume_path else None,
+        }
+
+    def list_workspace_files(self, sandbox_id: str, limit: int = 500) -> dict:
+        """File trong volume giả lập (debug: kiểm việc nạp mã nguồn)."""
+        sandbox = self._get_or_raise(sandbox_id)
+        files: list[dict] = []
+        if sandbox.volume_path is not None and sandbox.volume_path.is_dir():
+            for f in sorted(sandbox.volume_path.rglob("*")):
+                if f.is_file():
+                    files.append({"path": f.relative_to(sandbox.volume_path).as_posix(), "size": f.stat().st_size})
+        return {"files": files[:limit], "total": len(files), "truncated": len(files) > limit}
+
+    def read_workspace_file(self, sandbox_id: str, path: str, max_bytes: int = 256 * 1024) -> dict:
+        sandbox = self._get_or_raise(sandbox_id)
+        root = sandbox.volume_path
+        target = (root / path).resolve() if root is not None else None
+        if root is None or target is None or not target.is_relative_to(root.resolve()) or not target.is_file():
+            raise AppError(ErrorCode.file_not_found, f"Không có '{path}' trong sandbox")
+        data = target.read_bytes()
+        return {"path": path, "size": len(data), "content": data[:max_bytes], "truncated": len(data) > max_bytes}
+
+    def cleanup_workspace(self, session_id: str) -> None:
+        """Dọn volume của session khi tạo sandbox thất bại (idempotent)."""
+        shutil.rmtree(self._volume_dir(session_id), ignore_errors=True)
 
     # --- Nội bộ ---
 

@@ -16,6 +16,7 @@ class ErrorCode(str, Enum):
     invalid_path = "invalid_path"
     invalid_request = "invalid_request"
     conflict = "conflict"
+    provider_unavailable = "provider_unavailable"
     internal_error = "internal_error"
 
 

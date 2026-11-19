@@ -111,7 +111,7 @@ raise qua kênh MCP** (agent AI đọc được lỗi có cấu trúc, không b�
 | A5 | **Lỗi tool = payload `{"error": …}`, không raise** | agent AI đọc lỗi có cấu trúc; tool-call không gãy giữa chừng |
 | A6 | `file_write` với file >3MB → mã `file_too_large` + `upload_hint` (chưa trả `upload_url` như §4) | PoC W1: client dùng REST trực tiếp; flow metadata→upload_url hoàn thiện W5 |
 | A7 | **History C5 trong core VFS**: same-sha no-op; patch full-content chỉ cho text ≤1MB; trần 20 patch/path (DELETE sau INSERT) | đúng §10-C5; placeholder `"[full-content-skipped: N bytes]"` |
-| A8 | **Seed volume W1 = copy nguyên thư mục workspace** | đủ để dữ liệu thật vào volume fake; W3 thay bằng materialize VFS→volume theo revision |
+| A8 | ~~Seed volume W1 = copy nguyên thư mục workspace~~ | **Lỗi, đã sửa ở W2:** thư mục đó chỉ chứa blob, file nguồn nằm trong SQLite → sandbox nhận 0 file. W2 xuất file từ VFS ra volume (xem `w2-implementation.md`) |
 | A9 | **`request_id` do server sinh (uuid)** — chưa client-driven | idempotency thật (client gửi lại mã cũ) là hardening W4 |
 | A10 | Binary đọc: `\0` trong 8000 byte đầu → `is_binary`; decode UTF-8 fail vẫn base64 | an toàn hai lớp |
 | A11 | `gc_staging` là hàm thuần, chưa scheduler | gọi trong test/gate; scheduler asyncio đặt W4 cùng reaper |

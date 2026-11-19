@@ -22,9 +22,11 @@ from sandbox_kit_clone.gateway import (
     upload_router,
 )
 from sandbox_kit_clone.gateway.admin_api import admin_api_router
+from sandbox_kit_clone.gateway.admin_sandbox_api import admin_sandbox_router
 from sandbox_kit_clone.gateway.mcp_server import register_tools
 from sandbox_kit_clone.manager.manager import Manager
-from sandbox_kit_clone.providers.fake import FakeProvider
+from sandbox_kit_clone.providers.base import SandboxProvider
+from sandbox_kit_clone.providers.factory import get_provider
 
 # Tên MCP server hiển thị cho client (Inspector / Claude Code...).
 MCP_SERVER_NAME = "sandbox-kit-clone"
@@ -33,19 +35,21 @@ MCP_SERVER_NAME = "sandbox-kit-clone"
 ADMIN_HTML_PATH = Path(__file__).parent / "admin.html"
 # Trang quản lý VFS (dev tool): duyệt/sửa file, lịch sử, dấu xóa, thử thuật toán.
 VFS_HTML_PATH = Path(__file__).parent / "vfs.html"
+# Trang quản lý sandbox (dev tool): vòng đời container, file /workspace, log, số liệu.
+SANDBOX_HTML_PATH = Path(__file__).parent / "sandbox.html"
 
 
 def create_app(
     settings: Settings | None = None,
-    provider: FakeProvider | None = None,
+    provider: SandboxProvider | None = None,
 ) -> FastAPI:
     """Dựng app hoàn chỉnh: REST (upload/download/health) + MCP mount tại ``/mcp``.
 
-    ``settings``/``provider`` truyền vào cho test; mặc định đọc cấu hình env +
-    FakeProvider lưu volume dưới ``data/fake-sandboxes``.
+    ``settings``/``provider`` truyền vào cho test; mặc định đọc cấu hình env và chọn
+    provider theo ``SANDBOX_KIT_PROVIDER`` (fake | docker).
     """
     settings = settings or get_settings()
-    provider = provider or FakeProvider(base_dir=Path(settings.data_dir) / "fake-sandboxes")
+    provider = provider or get_provider(settings)
     manager = Manager(settings, provider)
 
     # streamable_http_path="/" để mount tại "/mcp" ra đúng URL /mcp (không nhân đôi).
@@ -80,9 +84,15 @@ def create_app(
         """Trang quản lý VFS (dev tool) — dùng REST ``/admin/api/*``."""
         return HTMLResponse(VFS_HTML_PATH.read_text(encoding="utf-8"))
 
+    @app.get("/admin/sandboxes", include_in_schema=False)
+    def admin_sandboxes() -> HTMLResponse:
+        """Trang quản lý sandbox (dev tool) — dùng REST ``/admin/api/sandboxes*``."""
+        return HTMLResponse(SANDBOX_HTML_PATH.read_text(encoding="utf-8"))
+
     app.include_router(upload_router)
     app.include_router(download_router)
     app.include_router(admin_api_router)
+    app.include_router(admin_sandbox_router)
     install_error_handlers(app)
     app.mount("/mcp", mcp.streamable_http_app())
     return app

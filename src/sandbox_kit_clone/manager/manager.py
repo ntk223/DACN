@@ -11,6 +11,7 @@ Trách nhiệm (docs/system-design.md §3, §4):
 
 from __future__ import annotations
 
+import shutil
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -26,9 +27,6 @@ from sandbox_kit_clone.vfs.schema import (
     init_workspace_db,
     validate_conflict_policy,
 )
-
-# Image mặc định cho PoC (W2 sẽ thay bằng image thật theo cấu hình).
-DEFAULT_SANDBOX_IMAGE = "poc/python-toolchain"
 
 # Số lần thử lại khi workspace_id trùng (xác suất cực hiếm — uuid4().hex[:12]).
 _CREATE_WORKSPACE_RETRIES = 3
@@ -163,17 +161,32 @@ class Manager:
         cpu: int | None,
         memory: int | None,
     ) -> dict:
-        # W1 seed nguyên thư mục workspace (W3 thay bằng materialize VFS→volume).
-        # Thư mục sidecar do VFS tạo — đảm bảo có trước để seed cả khi chưa ghi file nào.
-        self.workspace_dir(workspace_id).mkdir(parents=True, exist_ok=True)
-        volume = self.provider.prepare_workspace(session_id, str(self.workspace_dir(workspace_id)))
-        sandbox_id = self.provider.create_sandbox(
-            session_id,
-            image=DEFAULT_SANDBOX_IMAGE,
-            ttl_seconds=ttl_seconds,
-            cpu=cpu,
-            memory=memory,
-        )
+        # §7.1 / design-01 §6.1: xuất file từ VFS ra thư mục tạm → provider chép vào volume
+        # (không đi qua kênh đồng bộ) → đánh dấu synced_sha256 + mốc đồng bộ.
+        staging, exported, revision = self._export_workspace(session_id, workspace_id)
+        try:
+            volume = self.provider.prepare_workspace(session_id, str(staging))
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+        try:
+            sandbox_id = self.provider.create_sandbox(
+                session_id,
+                image=self.settings.sandbox_image,
+                ttl_seconds=ttl_seconds,
+                cpu=cpu,
+                memory=memory,
+            )
+        except Exception:
+            cleanup = getattr(self.provider, "cleanup_workspace", None)
+            if callable(cleanup):
+                cleanup(session_id)
+            raise
+        _ws, vfs = self.resolve_session(session_id)
+        try:
+            for path, sha in exported:
+                vfs.set_synced_sha(path, sha)
+        finally:
+            vfs.close()
         self.store.set_session_sandbox(session_id, sandbox_id)
         self.store.update_session_state(session_id, "RUNNING")
         expires_at = (
@@ -182,14 +195,45 @@ class Manager:
             else None
         )
         self.store.set_session_expiry(session_id, expires_at)
-        # Row sync_state sẵn cho W3 (push/pull cập nhật last_synced_revision về sau).
-        self.store.upsert_sync_state(sandbox_id, workspace_id)
+        self.store.upsert_sync_state(
+            sandbox_id, workspace_id, last_synced_revision=revision, status="synced"
+        )
         return {
             "sandbox_id": sandbox_id,
             "state": "RUNNING",
             "dial_target": self.provider.get_dial_target(sandbox_id),
             "volume": volume,
+            "materialized_files": len(exported),
+            "synced_revision": revision,
         }
+
+    def _export_workspace(self, session_id: str, workspace_id: str) -> tuple[Path, list[tuple[str, str]], int]:
+        """Ghi toàn bộ file hiện có của VFS ra ``data/materialize/{session}/``.
+
+        Trả ``(thư mục, [(path, sha256)], revision)``. File rời (blob) chép thẳng từ
+        sidecar, không nạp vào bộ nhớ.
+        """
+        staging = Path(self.settings.data_dir) / "materialize" / session_id
+        shutil.rmtree(staging, ignore_errors=True)
+        staging.mkdir(parents=True)
+        _ws, vfs = self.resolve_session(session_id)
+        exported: list[tuple[str, str]] = []
+        try:
+            revision = vfs.revision
+            for item in vfs.list_files():
+                info = vfs.get_file_info(item["path"])
+                if info is None:
+                    continue
+                target = staging / info["path"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if info["storage_class"] == "blob" and info["blob_ref"]:
+                    shutil.copyfile(vfs.blobs.path_of(info["blob_ref"]), target)
+                else:
+                    target.write_bytes(vfs.read_file(info["path"]))
+                exported.append((info["path"], info["sha256"]))
+        finally:
+            vfs.close()
+        return staging, exported, revision
 
     def sandbox_stop(self, session_id: str) -> dict:
         """Hủy sandbox + phiên về STANDBY; phải đang RUNNING/PAUSED."""
@@ -311,6 +355,84 @@ class Manager:
         except AppError:
             return None
 
+    # ------------------------------------------------------ quản trị sandbox
+
+    def sandbox_overview(self) -> dict:
+        """Ghép phiên (system DB) với sandbox thật (provider) cho trang quản trị.
+
+        - ``sessions``: mọi phiên + trạng thái theo provider; ``drift`` = state ghi sổ lệch thực tế.
+        - ``orphans``: sandbox provider còn giữ nhưng không phiên nào trỏ tới (ứng viên dọn).
+        """
+        live = set(self.provider.list_sandboxes())
+        sessions = []
+        referenced: set[str] = set()
+        for row in self.store.list_sessions():
+            sandbox_id = row["sandbox_id"]
+            active = row["state"] in ("RUNNING", "PAUSED", "STARTING")
+            if sandbox_id and active:
+                referenced.add(sandbox_id)
+            provider_state = self._provider_state(sandbox_id) if sandbox_id in live else None
+            sessions.append(
+                {
+                    **row,
+                    "provider_state": provider_state,
+                    "drift": _state_drift(row["state"], provider_state),
+                }
+            )
+        orphans = []
+        for sandbox_id in sorted(live - referenced):
+            try:
+                orphans.append(self.provider.describe_sandbox(sandbox_id))
+            except (AppError, AttributeError):
+                orphans.append({"sandbox_id": sandbox_id})
+        return {
+            "provider": getattr(self.provider, "name", type(self.provider).__name__),
+            "capabilities": getattr(self.provider, "capabilities", {}),
+            "image": self.settings.sandbox_image,
+            "sessions": sessions,
+            "orphans": orphans,
+        }
+
+    def sandbox_detail(self, sandbox_id: str) -> dict:
+        """Mô tả + số liệu + danh sách file /workspace của một sandbox (tính năng nào thiếu → bỏ qua)."""
+        if sandbox_id not in self.provider.list_sandboxes():
+            raise AppError(ErrorCode.invalid_request, f"Sandbox không tồn tại hoặc đã bị hủy: {sandbox_id}")
+        out: dict = {"sandbox_id": sandbox_id}
+        for key, method in (
+            ("info", "describe_sandbox"),
+            ("metrics", "get_sandbox_metrics"),
+            ("workspace", "list_workspace_files"),
+        ):
+            fn = getattr(self.provider, method, None)
+            if not callable(fn):
+                continue
+            try:
+                out[key] = fn(sandbox_id)
+            except NotImplementedError:
+                continue
+            except AppError as exc:
+                out[key] = {"error": exc.to_payload()["error"]}
+        return out
+
+    def terminate_orphan(self, sandbox_id: str) -> dict:
+        """Dọn sandbox mồ côi. Sandbox còn phiên đang dùng → từ chối (dùng sandbox_stop)."""
+        for row in self.store.list_sessions():
+            if row["sandbox_id"] == sandbox_id and row["state"] in ("RUNNING", "PAUSED", "STARTING"):
+                raise AppError(
+                    ErrorCode.conflict,
+                    f"Sandbox {sandbox_id} đang thuộc phiên {row['session_id']} — dùng sandbox_stop",
+                )
+        workspace_id = ""
+        for row in self.store.list_sessions():
+            if row["sandbox_id"] == sandbox_id:
+                workspace_id = row["workspace_id"]
+        return self._op(
+            "sandbox_orphan_cleanup",
+            workspace_id,
+            sandbox_id,
+            lambda: (self.provider.terminate_sandbox(sandbox_id), {"terminated": sandbox_id})[1],
+        )
+
     # ------------------------------------------------------------------ sync
 
     def sync_status(self, session_id: str) -> dict:
@@ -357,3 +479,11 @@ class Manager:
             return datetime.fromisoformat(value)
         except ValueError:
             return None
+
+
+def _state_drift(session_state: str, provider_state: str | None) -> bool:
+    """Sổ ghi phiên RUNNING/PAUSED nhưng provider báo khác (hoặc mất sandbox) → lệch."""
+    expected = {"RUNNING": "running", "PAUSED": "paused"}.get(session_state)
+    if expected is None:
+        return False
+    return provider_state != expected

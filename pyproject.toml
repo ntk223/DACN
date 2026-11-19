@@ -17,6 +17,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = ["docker: cần Docker daemon + image sandbox (make test-docker)"]
 
 [tool.ruff]
 line-length = 110

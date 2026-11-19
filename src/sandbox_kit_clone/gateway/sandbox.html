@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandbox Kit Clone — Quản lý sandbox</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --sunk: #010409;
+    --border: #30363d; --border-soft: #21262d;
+    --text: #e6edf3; --dim: #9198a1;
+    --accent: #58a6ff; --accent-bg: #1f6feb;
+    --green: #3fb950; --red: #f85149; --orange: #ffa657; --purple: #d2a8ff;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #ffffff; --panel: #f6f8fa; --sunk: #eaeef2;
+      --border: #d0d7de; --border-soft: #e5e9ee;
+      --text: #1f2328; --dim: #59636e;
+      --accent: #0969da; --accent-bg: #0969da;
+      --green: #1a7f37; --red: #cf222e; --orange: #bc4c00; --purple: #8250df;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.45; }
+  a { color: var(--accent); }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 9px 16px; border-bottom: 1px solid var(--border); background: var(--sunk); position: sticky; top: 0; z-index: 10; }
+  header .logo { font-weight: 700; color: var(--accent); }
+  header .spacer { flex: 1; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); color: var(--dim); white-space: nowrap; }
+  .b-ok { color: var(--green); border-color: var(--green); }
+  .b-err { color: var(--red); border-color: var(--red); }
+  .b-warn { color: var(--orange); border-color: var(--orange); }
+  .b-info { color: var(--accent); border-color: var(--accent); }
+  .b-purple { color: var(--purple); border-color: var(--purple); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; padding: 12px; align-items: start; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; padding: 12px 16px; } }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+  .panel-head h2 { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .panel-body { padding: 10px 12px; }
+  .dim { color: var(--dim); } .small { font-size: 11.5px; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .mt { margin-top: 8px; }
+  .empty { color: var(--dim); padding: 14px 0; text-align: center; }
+  .hidden { display: none !important; }
+  input[type="number"], input[type="text"] { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 7px; font-family: var(--mono); font-size: 12px; }
+  input[type="number"] { width: 84px; }
+  input:focus { outline: none; border-color: var(--accent-bg); }
+  label.f { display: inline-flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--dim); }
+  label.chk { display: inline-flex; gap: 5px; align-items: center; color: var(--dim); font-size: 12px; cursor: pointer; }
+  .btn { background: var(--border-soft); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 11px; cursor: pointer; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  .btn:hover { background: var(--border); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn-primary { background: var(--accent-bg); border-color: var(--accent-bg); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.15); background: var(--accent-bg); }
+  .btn-danger { color: var(--red); }
+  .btn.sm { padding: 2px 8px; font-size: 11.5px; }
+
+  .sess { border: 1px solid var(--border-soft); border-radius: 8px; padding: 9px 10px; margin-bottom: 8px; cursor: pointer; }
+  .sess:hover { border-color: var(--border); }
+  .sess.active { border-color: var(--accent-bg); }
+  .sess .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sess .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .sess .meta { color: var(--dim); font-size: 11.5px; margin-top: 3px; word-break: break-all; }
+  .sess .actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-end; }
+
+  dl.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; margin: 0; font-size: 12px; }
+  dl.kv dt { color: var(--dim); } dl.kv dd { margin: 0; word-break: break-all; }
+  .meter { height: 6px; background: var(--border-soft); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .meter > div { height: 100%; background: var(--accent-bg); }
+  .files { max-height: 280px; overflow: auto; border: 1px solid var(--border-soft); border-radius: 6px; }
+  .file { display: flex; justify-content: space-between; gap: 10px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
+  .file:hover { background: var(--border-soft); }
+  .file.active { background: var(--border-soft); color: var(--accent); }
+  .file .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  pre.out { margin: 0; background: var(--sunk); border: 1px solid var(--border-soft); border-radius: 6px; padding: 8px 10px; max-height: 320px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  #toast { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; z-index: 20; max-width: min(420px, calc(100vw - 32px)); }
+  .toast { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .toast.err { border-left-color: var(--red); } .toast.warn { border-left-color: var(--orange); }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Sandbox Kit Clone — Quản lý sandbox</span>
+  <span id="prov" class="badge">…</span>
+  <span class="spacer"></span>
+  <label class="chk"><input type="checkbox" id="auto" checked> tự làm mới 5s</label>
+  <a href="/admin/vfs" class="small">Quản lý VFS →</a>
+  <a href="/admin" class="small">API console →</a>
+  <button id="btn-reload" class="btn sm" title="Tải lại (R)">Tải lại</button>
+</header>
+
+<div class="layout">
+  <div class="col">
+    <div class="panel">
+      <div class="panel-head"><h2>Phiên làm việc</h2><span id="sess-count" class="dim small"></span></div>
+      <div class="panel-body">
+        <div class="row small dim" style="margin-bottom:8px">
+          Thông số khi bật:
+          <label class="f">TTL (giây)<input type="number" id="in-ttl" value="3600" min="0"></label>
+          <label class="f">CPU<input type="number" id="in-cpu" placeholder="không giới hạn" step="0.5" min="0"></label>
+          <label class="f">RAM (MB)<input type="number" id="in-mem" placeholder="không giới hạn" step="128" min="0"></label>
+        </div>
+        <div id="sessions"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Sandbox mồ côi</h2><span class="dim small">provider còn giữ, không phiên nào dùng</span></div>
+      <div class="panel-body" id="orphans"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <div class="panel-head"><h2>Chi tiết sandbox</h2><span id="det-id" class="dim small"></span></div>
+      <div class="panel-body" id="detail"><div class="empty">Chọn một phiên có sandbox để xem.</div></div>
+    </div>
+    <div class="panel hidden" id="p-files">
+      <div class="panel-head"><h2>/workspace trong sandbox</h2><span id="files-count" class="dim small"></span></div>
+      <div class="panel-body">
+        <div class="files" id="files"></div>
+        <div class="mt hidden" id="fview">
+          <div class="row small"><b id="fv-path"></b><span id="fv-meta" class="dim"></span></div>
+          <pre class="out mt" id="fv-content"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="panel hidden" id="p-logs">
+      <div class="panel-head"><h2>Log container</h2><button class="btn sm" id="btn-logs">Tải log</button></div>
+      <div class="panel-body"><pre class="out" id="logs">—</pre></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const S = { data: null, selected: null, file: null, busy: false };
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; }
+function badge(text, kind) { return el("span", "badge " + (kind || ""), text); }
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+function fmtBytes(n) { if (n == null) return "—"; const u = ["B", "KB", "MB", "GB"]; let i = 0; let v = n; while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; } return (i ? v.toFixed(1) : v) + " " + u[i]; }
+function fmtTime(iso) { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString("vi-VN", { hour12: false }); }
+function remain(iso) {
+  if (!iso) return "không hết hạn";
+  const s = Math.round((new Date(iso) - Date.now()) / 1000);
+  if (isNaN(s)) return iso;
+  if (s <= 0) return "đã quá hạn";
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return "còn " + (h ? h + "h " : "") + m + "m";
+}
+function kv(dl, pairs) { clear(dl); for (const [k, v] of pairs) { dl.appendChild(el("dt", null, k)); const dd = el("dd"); if (v instanceof Node) dd.appendChild(v); else dd.textContent = v == null || v === "" ? "—" : String(v); dl.appendChild(dd); } }
+function toast(msg, kind) { const t = el("div", "toast " + (kind || ""), msg); $("toast").appendChild(t); setTimeout(() => t.remove(), kind === "err" ? 7000 : 3500); }
+
+async function api(method, url, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const res = await fetch(url, opt);
+  let data = null; try { data = await res.json(); } catch (_) { /* rỗng */ }
+  if (!res.ok || (data && data.error)) {
+    const e = (data && (data.error || data.detail)) || {};
+    const msg = typeof e === "string" ? e : (e.code ? e.code + ": " : "") + (e.message || JSON.stringify(e));
+    throw new Error(msg || ("HTTP " + res.status));
+  }
+  return data;
+}
+
+const STATE_KIND = { RUNNING: "b-ok", PAUSED: "b-warn", STANDBY: "", STARTING: "b-info" };
+const PSTATE_KIND = { running: "b-ok", paused: "b-warn", stopped: "b-err", created: "b-info" };
+
+async function load() {
+  try { S.data = await api("GET", "/admin/api/sandboxes"); }
+  catch (e) { $("prov").textContent = "lỗi"; $("prov").className = "badge b-err"; toast(e.message, "err"); return; }
+  const d = S.data;
+  $("prov").textContent = "provider: " + d.provider + " · image " + d.image;
+  $("prov").className = "badge " + (d.provider === "docker" ? "b-info" : "b-purple");
+  renderSessions(); renderOrphans();
+  if (S.selected) await loadDetail(S.selected, true);
+}
+
+function renderSessions() {
+  const box = $("sessions"); clear(box);
+  const list = S.data.sessions;
+  $("sess-count").textContent = list.length + " phiên · " + list.filter(s => s.state === "RUNNING" || s.state === "PAUSED").length + " đang có sandbox";
+  if (!list.length) { box.appendChild(el("div", "empty", "Chưa có phiên nào — tạo workspace ở trang Quản lý VFS.")); return; }
+  const caps = S.data.capabilities || {};
+  for (const s of list) {
+    const card = el("div", "sess" + (S.selected && S.selected === s.sandbox_id && (s.state === "RUNNING" || s.state === "PAUSED") ? " active" : ""));
+    const top = el("div", "top");
+    top.appendChild(el("span", "name", s.workspace_name || s.workspace_id));
+    top.appendChild(badge(s.state, STATE_KIND[s.state]));
+    const live = s.state === "RUNNING" || s.state === "PAUSED";
+    if (live) top.appendChild(badge("thực tế: " + (s.provider_state || "mất"), PSTATE_KIND[s.provider_state] || "b-err"));
+    if (s.drift) top.appendChild(badge("lệch sổ", "b-err"));
+    card.appendChild(top);
+    const meta = el("div", "meta");
+    meta.textContent = "workspace " + s.workspace_id + " · phiên " + s.session_id.slice(0, 12) + "…" +
+      (live && s.sandbox_id ? " · " + s.sandbox_id + " · " + remain(s.expires_at) : "");
+    card.appendChild(meta);
+
+    const act = el("div", "actions");
+    const add = (label, fn, cls, enabled) => { const b = el("button", "btn sm " + (cls || ""), label); b.disabled = !enabled; b.onclick = (ev) => { ev.stopPropagation(); fn(); }; act.appendChild(b); };
+    add("Bật", () => doAction(s, "start"), "btn-primary", s.state === "STANDBY");
+    add("Tạm dừng", () => doAction(s, "pause"), "", s.state === "RUNNING" && caps.pause_resume !== false);
+    add("Tiếp tục", () => doAction(s, "resume"), "", s.state === "PAUSED");
+    add("Gia hạn +1h", () => doAction(s, "renew"), "", live);
+    add("Dừng & xóa", () => doAction(s, "stop"), "btn-danger", live);
+    card.appendChild(act);
+    if (live && s.sandbox_id) card.onclick = () => select(s.sandbox_id);
+    box.appendChild(card);
+  }
+}
+
+function renderOrphans() {
+  const box = $("orphans"); clear(box);
+  const list = S.data.orphans;
+  if (!list.length) { box.appendChild(el("div", "empty", "Không có sandbox mồ côi.")); return; }
+  for (const o of list) {
+    const card = el("div", "sess" + (S.selected === o.sandbox_id ? " active" : ""));
+    const top = el("div", "top");
+    top.appendChild(el("span", "name", o.sandbox_id));
+    if (o.state) top.appendChild(badge(o.state, PSTATE_KIND[o.state]));
+    card.appendChild(top);
+    card.appendChild(el("div", "meta", "phiên " + (o.session_id || "?") + " · tạo " + fmtTime(o.created_at)));
+    const act = el("div", "actions");
+    const b = el("button", "btn sm btn-danger", "Dọn sandbox + volume");
+    b.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (!confirm("Xóa sandbox " + o.sandbox_id + " và volume của nó?")) return;
+      try { await api("DELETE", "/admin/api/sandboxes/" + encodeURIComponent(o.sandbox_id)); toast("Đã dọn " + o.sandbox_id); if (S.selected === o.sandbox_id) unselect(); await load(); }
+      catch (e) { toast(e.message, "err"); }
+    };
+    act.appendChild(b); card.appendChild(act);
+    card.onclick = () => select(o.sandbox_id);
+    box.appendChild(card);
+  }
+}
+
+async function doAction(s, action) {
+  if (S.busy) { toast("Đang chờ thao tác trước xong — thử lại sau giây lát", "warn"); return; }
+  if (action === "stop" && !confirm("Dừng phiên và XÓA sandbox " + s.sandbox_id + " cùng volume? (File trong kho VFS không mất.)")) return;
+  let body;
+  if (action === "start") {
+    const num = (id) => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+    body = { ttl_seconds: Math.round(num("in-ttl") ?? 3600), cpu: num("in-cpu"), memory: num("in-mem") };
+  } else if (action === "renew") body = { ttl_seconds: 3600 };
+  S.busy = true; document.body.style.cursor = "progress";
+  try {
+    const r = await api("POST", "/admin/api/sessions/" + encodeURIComponent(s.session_id) + "/" + action, body);
+    if (action === "start") { toast("Đã bật " + r.sandbox_id + " · nạp " + r.materialized_files + " file (rev " + r.synced_revision + ")"); S.selected = r.sandbox_id; }
+    else if (action === "stop") { toast("Đã dừng — sandbox và volume đã xóa"); if (S.selected === s.sandbox_id) unselect(); }
+    else if (action === "renew") toast("Hạn mới: " + fmtTime(r.expires_at));
+    else toast("Phiên → " + r.state);
+  } catch (e) { toast(e.message, "err"); }
+  finally { S.busy = false; document.body.style.cursor = ""; }
+  await load();  // tải lại SAU khi thả cờ bận — số liệu Docker chậm không chặn thao tác kế
+}
+
+function unselect() {
+  S.selected = null; S.file = null;
+  $("det-id").textContent = ""; clear($("detail")); $("detail").appendChild(el("div", "empty", "Chọn một phiên có sandbox để xem."));
+  $("p-files").classList.add("hidden"); $("p-logs").classList.add("hidden");
+}
+
+async function select(id) {
+  if (S.selected !== id) { S.file = null; $("fview").classList.add("hidden"); $("logs").textContent = "—"; }
+  S.selected = id; renderSessions(); renderOrphans();
+  await loadDetail(id, false);
+}
+
+async function loadDetail(id, quiet) {
+  let d;
+  try { d = await api("GET", "/admin/api/sandboxes/" + encodeURIComponent(id)); }
+  catch (e) { if (!quiet) toast(e.message, "err"); unselect(); return; }
+  if (S.selected !== id) return;
+  $("det-id").textContent = id;
+  const box = $("detail"); clear(box);
+  const info = d.info || {};
+  if (info.error) box.appendChild(el("div", "dim", info.error.message));
+  const dl = el("dl", "kv"); box.appendChild(dl);
+  kv(dl, [
+    ["Trạng thái", badge(info.state || "?", PSTATE_KIND[info.state])],
+    ["Phiên", info.session_id],
+    ["Image", info.image],
+    ["Tạo lúc", fmtTime(info.created_at)],
+    ["Hết hạn", info.expires_at ? fmtTime(info.expires_at) + " (" + remain(info.expires_at) + ")" : "không hết hạn"],
+    ["Cổng trình thực thi", info.dial_target],
+    ["Volume /workspace", info.volume],
+    ["Giới hạn", (info.cpu ? info.cpu + " CPU" : "CPU tự do") + " · " + (info.memory_mb ? info.memory_mb + " MB" : "RAM tự do")],
+    ["Mạng", info.network],
+    ...(info.oom_killed ? [["OOM", badge("bị kill vì hết RAM", "b-err")]] : []),
+  ].filter(([, v]) => v !== undefined));
+
+  const m = d.metrics;
+  if (m && m.available) {
+    const wrap = el("div", "mt small");
+    wrap.appendChild(el("div", null, "CPU " + m.cpu_percent + "% · RAM " + fmtBytes(m.memory_bytes) + " / " + fmtBytes(m.memory_limit_bytes) + (m.pids != null ? " · " + m.pids + " tiến trình" : "")));
+    const bar = el("div", "meter"); const fill = el("div"); fill.style.width = Math.min(100, m.memory_limit_bytes ? m.memory_bytes / m.memory_limit_bytes * 100 : 0) + "%"; bar.appendChild(fill); wrap.appendChild(bar);
+    box.appendChild(wrap);
+  } else if (m && m.reason) box.appendChild(el("div", "mt small dim", "Số liệu: " + m.reason));
+
+  const ws = d.workspace;
+  $("p-files").classList.toggle("hidden", !ws);
+  if (ws) renderFiles(ws);
+  $("p-logs").classList.toggle("hidden", !(S.data && S.data.capabilities && S.data.capabilities.diagnostics));
+}
+
+function renderFiles(ws) {
+  const box = $("files"); clear(box);
+  if (ws.error) { box.appendChild(el("div", "empty", ws.error.message)); return; }
+  $("files-count").textContent = ws.total + " file" + (ws.truncated ? " (hiện " + ws.files.length + ")" : "");
+  if (!ws.files.length) { box.appendChild(el("div", "empty", "/workspace trống")); return; }
+  for (const f of ws.files) {
+    const row = el("div", "file" + (S.file === f.path ? " active" : ""));
+    row.appendChild(el("span", "p", f.path)); row.appendChild(el("span", "dim", fmtBytes(f.size)));
+    row.onclick = () => openFile(f.path);
+    box.appendChild(row);
+  }
+}
+
+async function openFile(path) {
+  S.file = path;
+  for (const r of $("files").children) r.classList.toggle("active", r.firstChild && r.firstChild.textContent === path);
+  try {
+    const f = await api("GET", "/admin/api/sandboxes/" + encodeURIComponent(S.selected) + "/file?path=" + encodeURIComponent(path));
+    $("fview").classList.remove("hidden");
+    $("fv-path").textContent = f.path;
+    $("fv-meta").textContent = " · " + fmtBytes(f.size) + (f.truncated ? " · đã cắt" : "") + (f.encoding === "base64" ? " · nhị phân (base64)" : "");
+    $("fv-content").textContent = f.content;
+  } catch (e) { toast(e.message, "err"); }
+}
+
+async function loadLogs() {
+  if (!S.selected) return;
+  try {
+    const r = await api("GET", "/admin/api/sandboxes/" + encodeURIComponent(S.selected) + "/logs?tail=300");
+    $("logs").textContent = r.available ? (r.logs || "(chưa có log)") : "Provider không hỗ trợ log.";
+  } catch (e) { toast(e.message, "err"); }
+}
+
+$("btn-reload").onclick = load;
+$("btn-logs").onclick = loadLogs;
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "r" || e.key === "R") load();
+});
+setInterval(() => { if ($("auto").checked && !S.busy && !document.hidden) load(); }, 5000);
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+"""REST cho trang quản lý sandbox (``/admin/sandboxes``) — dev tool, KHÔNG nằm trong OpenAPI.
+
+Thao tác vòng đời đi qua đúng ``Manager`` (cùng kiểm trạng thái + ghi sổ thao tác như tool
+MCP). Phần xem (file trong /workspace, log, số liệu) gọi thẳng các hàm tùy chọn của provider;
+provider nào không có thì trả ``available: false`` thay vì lỗi.
+"""
+
+from __future__ import annotations
+
+import base64
+
+from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel
+
+from sandbox_kit_clone.errors import AppError, ErrorCode
+from sandbox_kit_clone.gateway.admin_api import _read_manifest
+from sandbox_kit_clone.manager.manager import Manager
+
+admin_sandbox_router = APIRouter(prefix="/admin/api", include_in_schema=False)
+
+
+class StartBody(BaseModel):
+    ttl_seconds: int = 3600
+    cpu: float | None = None
+    memory: int | None = None  # MB
+
+
+class RenewBody(BaseModel):
+    ttl_seconds: int = 3600
+
+
+def _manager(request: Request) -> Manager:
+    return request.app.state.manager
+
+
+def _provider_fn(manager: Manager, name: str):
+    fn = getattr(manager.provider, name, None)
+    return fn if callable(fn) else None
+
+
+def _known_sandbox(manager: Manager, sandbox_id: str) -> None:
+    if sandbox_id not in manager.provider.list_sandboxes():
+        raise AppError(
+            ErrorCode.invalid_request,
+            f"Sandbox không tồn tại hoặc đã bị hủy: {sandbox_id}",
+            details={"http_status": 404},
+        )
+
+
+@admin_sandbox_router.get("/sandboxes")
+def overview(request: Request) -> dict:
+    manager = _manager(request)
+    data = manager.sandbox_overview()
+    labels = _read_manifest(manager)
+    for row in data["sessions"]:
+        meta = labels.get(row["workspace_id"], {})
+        row["workspace_name"] = meta.get("name")
+    return data
+
+
+@admin_sandbox_router.post("/sessions/{session_id}/start")
+def start(request: Request, session_id: str, body: StartBody) -> dict:
+    cpu = body.cpu if body.cpu and body.cpu > 0 else None
+    memory = body.memory if body.memory and body.memory > 0 else None
+    return _manager(request).sandbox_start(session_id, body.ttl_seconds, cpu, memory)
+
+
+@admin_sandbox_router.post("/sessions/{session_id}/{action}")
+def lifecycle(request: Request, session_id: str, action: str, body: RenewBody | None = None) -> dict:
+    manager = _manager(request)
+    if action == "stop":
+        return manager.sandbox_stop(session_id)
+    if action == "pause":
+        return manager.sandbox_pause(session_id)
+    if action == "resume":
+        return manager.sandbox_resume(session_id)
+    if action == "renew":
+        return manager.sandbox_renew(session_id, (body or RenewBody()).ttl_seconds)
+    raise AppError(ErrorCode.invalid_request, f"Thao tác không hỗ trợ: {action}", details={"http_status": 404})
+
+
+@admin_sandbox_router.get("/sandboxes/{sandbox_id}")
+def detail(request: Request, sandbox_id: str) -> dict:
+    manager = _manager(request)
+    _known_sandbox(manager, sandbox_id)
+    return manager.sandbox_detail(sandbox_id)
+
+
+@admin_sandbox_router.get("/sandboxes/{sandbox_id}/logs")
+def logs(request: Request, sandbox_id: str, tail: int = Query(200, ge=1, le=5000)) -> dict:
+    manager = _manager(request)
+    _known_sandbox(manager, sandbox_id)
+    fn = _provider_fn(manager, "get_sandbox_diagnostics")
+    try:
+        return {"available": True, **fn(sandbox_id, tail=tail)} if fn else {"available": False}
+    except NotImplementedError:
+        return {"available": False}
+
+
+@admin_sandbox_router.get("/sandboxes/{sandbox_id}/file")
+def read_file(request: Request, sandbox_id: str, path: str = Query(...)) -> dict:
+    manager = _manager(request)
+    _known_sandbox(manager, sandbox_id)
+    fn = _provider_fn(manager, "read_workspace_file")
+    if fn is None:
+        raise AppError(ErrorCode.invalid_request, "Provider không hỗ trợ đọc file trong sandbox")
+    result = fn(sandbox_id, path)
+    raw: bytes = result.pop("content")
+    try:
+        result.update(content=raw.decode("utf-8"), encoding="utf-8")
+    except UnicodeDecodeError:
+        result.update(content=base64.b64encode(raw).decode("ascii"), encoding="base64")
+    return result
+
+
+@admin_sandbox_router.delete("/sandboxes/{sandbox_id}")
+def terminate_orphan(request: Request, sandbox_id: str) -> dict:
+    manager = _manager(request)
+    _known_sandbox(manager, sandbox_id)
+    return manager.terminate_orphan(sandbox_id)

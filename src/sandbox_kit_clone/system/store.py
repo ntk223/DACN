@@ -96,6 +96,13 @@ class SystemStore:
             ).fetchone()
         return dict(row) if row is not None else None
 
+    def list_sessions(self) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM sessions ORDER BY created_at, session_id"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def update_session_state(self, session_id: str, state: str) -> None:
         self._update_session_row(session_id, "state", state)
 

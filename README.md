@@ -10,16 +10,17 @@ src/sandbox_kit_clone/
 ├── config.py, errors.py, main.py    # cấu hình, bộ lỗi chuẩn, điểm vào server
 ├── vfs/        # kho file: core (VFS), schema, blob, fuzzy, ignore, quota, paths
 ├── system/     # DB hệ thống: schema + SystemStore (workspaces/sessions/ops)
-├── providers/  # ABC SandboxProvider + FakeProvider (in-memory)
+├── providers/  # ABC SandboxProvider + FakeProvider (in-memory) + DockerProvider + factory
 ├── manager/    # Manager: điều phối workspace/session/sandbox
 └── gateway/    # FastAPI app: MCP mount /mcp, upload/download, health
+sandbox-image/Dockerfile           # image sandbox (make image)
 scripts/smoke_mcp_client.py        # smoke test bằng MCP client SDK thật
 ```
 
 ## Chạy nhanh
 
 ```bash
-make test; make lint   # pytest (71 test) + ruff check src tests
+make test; make lint   # pytest + ruff check src tests
 make seed     # tạo DB + workspace mẫu cho từng thuật toán VFS (tự kiểm ✓/✗)
 make run      # server tại http://127.0.0.1:8000
 python3 scripts/smoke_mcp_client.py    # smoke qua MCP thật (server phải đang chạy)
@@ -38,12 +39,35 @@ MCP endpoint: `http://127.0.0.1:8000/mcp` (transport streamable-http, stateless)
 
 Tùy chọn: `python3 scripts/init_db.py --data-dir /tmp/x --seed`.
 
+## Sandbox Docker
+
+```bash
+make image        # build sandbox-kit/sandbox:w2 (python:3.12-slim + git + curl)
+make run-docker   # server dùng provider Docker (mặc định là bộ giả lập "fake")
+make test-docker  # test trên Docker thật (bộ test thường tự bỏ qua khi thiếu Docker/image)
+```
+
+| Biến môi trường | Mặc định | Ý nghĩa |
+| :--- | :--- | :--- |
+| `SANDBOX_KIT_PROVIDER` | `fake` | `fake` (trong bộ nhớ) hoặc `docker`; giá trị lạ → dừng ngay lúc khởi động |
+| `SANDBOX_KIT_SANDBOX_IMAGE` | `sandbox-kit/sandbox:w2` | Image dùng khi bật sandbox |
+| `SANDBOX_KIT_SANDBOX_NETWORK` | `true` | `false` → container không ra mạng |
+
+Mỗi sandbox = 1 container `skc-…` + 1 volume `skc-vol-{session}` gắn `/workspace`, mang label
+`sandbox-kit=1`. Khi bật, toàn bộ file trong VFS được xuất ra volume (đánh dấu `synced_sha256`,
+mốc đồng bộ = revision hiện tại). Dừng = xóa cả container lẫn volume — file trong kho không mất.
+Cổng trình thực thi chỉ mở ở `127.0.0.1`; `/scratch` là tmpfs 256MB.
+
 ## Giao diện quản trị (dev tool)
 
 - `/admin/vfs` — **quản lý VFS**: danh sách workspace + hạn mức, cây file (nhãn blob / nhị phân),
   sửa & lưu (Ctrl+S), sửa khớp mờ (old_text tự lấy từ file hoặc đoạn đang chọn) có xem trước diff, đổi tên, xóa, upload (file lớn tự đi
   đường chunk), lịch sử có diff + khôi phục, dấu xóa, sổ thao tác, tab **Thuật toán** chạy thử
   chuẩn hóa đường dẫn / quy tắc không lưu / khớp mờ mà không ghi gì. Phím tắt: `N` file mới, `R` tải lại.
+- `/admin/sandboxes` — **quản lý sandbox**: bật (TTL / CPU / RAM) · tạm dừng · tiếp tục · gia hạn ·
+  dừng & xóa theo từng phiên; cảnh báo "lệch sổ" khi trạng thái ghi trong DB khác thực tế; danh sách
+  sandbox mồ côi + nút dọn; chi tiết container (cổng, volume, giới hạn, CPU/RAM), duyệt và đọc file
+  trong `/workspace`, xem log. Tự làm mới mỗi 5 giây.
 - `/admin` — console gọi thử 13 tool MCP + REST upload/download.
 - Cả hai dùng REST `/admin/api/*` (không có trong OpenAPI, **không xác thực** — chỉ chạy ở localhost).
 

@@ -16,10 +16,12 @@ def main() -> None:
     Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
     app = create_app(settings)
     base = f"http://{settings.host}:{settings.port}"
-    print("Sandbox Kit Clone (W1) đang chạy:")
+    print("Sandbox Kit Clone (W2) đang chạy:")
     print(f"  - MCP endpoint : {base}/mcp   (transport streamable-http)")
     print(f"  - Upload       : {base}/upload")
     print(f"  - Health       : {base}/health")
+    print(f"  - Quản trị     : {base}/admin/vfs · {base}/admin/sandboxes")
+    print(f"  - Provider     : {settings.provider} (image {settings.sandbox_image})")
     print(f"  - Thư mục dữ liệu: {Path(settings.data_dir).resolve()}")
     uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
 

@@ -1,0 +1,102 @@
+"""Provider Docker trên daemon thật — đánh dấu ``docker``; tự bỏ qua khi máy không có Docker/image.
+
+Chạy riêng: ``make test-docker``.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from sandbox_kit_clone.config import Settings
+from sandbox_kit_clone.errors import AppError
+from sandbox_kit_clone.manager.manager import Manager
+
+pytestmark = pytest.mark.docker
+
+IMAGE = Settings().sandbox_image
+
+
+def _docker_client():
+    try:
+        import docker
+
+        client = docker.from_env()
+        client.ping()
+        client.images.get(IMAGE)
+    except Exception as exc:  # noqa: BLE001 — mọi lý do không dùng được Docker đều là skip
+        pytest.skip(f"Docker hoặc image {IMAGE} không sẵn sàng: {exc}")
+    return client
+
+
+@pytest.fixture()
+def manager(tmp_path: Path):
+    client = _docker_client()
+    from sandbox_kit_clone.providers.docker import LABEL_SESSION, DockerProvider
+
+    provider = DockerProvider(image=IMAGE, client=client)
+    mgr = Manager(Settings(data_dir=str(tmp_path / "data"), provider="docker"), provider)
+    sessions: list[str] = []
+    mgr._test_sessions = sessions  # type: ignore[attr-defined]
+    yield mgr
+    # Dọn mọi thứ test đã tạo (kể cả khi test fail giữa chừng).
+    for c in client.containers.list(all=True, filters={"label": "sandbox-kit=1"}):
+        if c.labels.get(LABEL_SESSION) in sessions:
+            provider.terminate_sandbox(c.name)
+    for sid in sessions:
+        provider.cleanup_workspace(sid)
+
+
+def _workspace(mgr: Manager) -> str:
+    ws = mgr.create_workspace("docker-test")
+    mgr._test_sessions.append(ws["session_id"])  # type: ignore[attr-defined]
+    _w, vfs = mgr.resolve_session(ws["session_id"])
+    vfs.write_file("src/app.py", "print('hi')\n")
+    vfs.write_file("data/b.bin", bytes(range(256)))
+    vfs.close()
+    return ws["session_id"]
+
+
+def test_lifecycle_with_materialized_files(manager: Manager) -> None:
+    sid = _workspace(manager)
+    started = manager.sandbox_start(sid, ttl_seconds=600, cpu=1, memory=256)
+    sandbox_id = started["sandbox_id"]
+    provider = manager.provider
+    assert started["materialized_files"] == 2 and started["dial_target"].startswith("127.0.0.1:")
+
+    detail = manager.sandbox_detail(sandbox_id)
+    assert detail["info"]["state"] == "running" and detail["info"]["memory_mb"] == 256
+    assert [f["path"] for f in detail["workspace"]["files"]] == ["data/b.bin", "src/app.py"]
+    assert provider.read_workspace_file(sandbox_id, "data/b.bin")["content"] == bytes(range(256))
+
+    manager.sandbox_pause(sid)
+    assert provider.get_sandbox_state(sandbox_id) == "paused"
+    # Container đang tạm dừng vẫn liệt kê được file (qua archive).
+    assert provider.list_workspace_files(sandbox_id)["total"] == 2
+    manager.sandbox_resume(sid)
+    assert provider.get_sandbox_state(sandbox_id) == "running"
+    before = provider.get_expiry(sandbox_id)
+    manager.sandbox_renew(sid, 120)
+    assert (provider.get_expiry(sandbox_id) - before).total_seconds() == 120
+
+    volume = detail["info"]["volume"]
+    manager.sandbox_stop(sid)
+    assert sandbox_id not in provider.list_sandboxes()
+    assert not provider._volume_exists(volume)
+    provider.terminate_sandbox(sandbox_id)  # idempotent
+
+
+def test_orphan_is_listed_and_cleaned(manager: Manager) -> None:
+    provider = manager.provider
+    manager._test_sessions.append("orphan-session")  # type: ignore[attr-defined]
+    orphan = provider.create_sandbox("orphan-session", "", 60)
+    assert orphan in [o["sandbox_id"] for o in manager.sandbox_overview()["orphans"]]
+    manager.terminate_orphan(orphan)
+    assert orphan not in provider.list_sandboxes()
+
+
+def test_missing_image_is_clear_error(manager: Manager) -> None:
+    with pytest.raises(AppError) as exc:
+        manager.provider.create_sandbox("x", "sandbox-kit/khong-co:0", 60)
+    assert exc.value.code.value == "provider_unavailable" and "make image" in exc.value.message
