@@ -1,0 +1,306 @@
+/**
+ * vfs.css — style riêng của feature VFS.
+ * QUY TẮC: chỉ dùng biến từ styles/tokens.css, không hardcode màu.
+ * Tái dùng class chung của base.css: .card .btn .input .select .textarea .badge .table .mono .kbd.
+ */
+
+/* ---- Layout 2 cột: trái (workspace + cây file) / phải (tab) ---- */
+.vfs-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .vfs-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vfs-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.vfs-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.vfs-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.vfs-dim {
+  color: var(--color-text-muted);
+}
+
+.vfs-small {
+  font-size: var(--font-size-sm);
+}
+
+/* ---- Cặp key/value kiểu <dl> ---- */
+.vfs-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.vfs-kv-pair {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--space-3);
+}
+
+.vfs-kv dt {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.vfs-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Thanh hạn mức ---- */
+.vfs-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-surface-hover);
+  overflow: hidden;
+}
+
+.vfs-bar > div {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+/* ---- Danh sách workspace ---- */
+.vfs-ws {
+  padding: var(--space-2) 10px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vfs-ws:hover {
+  background: var(--color-surface-hover);
+}
+
+.vfs-ws.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.vfs-ws-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vfs-ws-meta {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ---- Cây file ---- */
+.vfs-tree {
+  max-height: 460px;
+  overflow: auto;
+  margin-top: var(--space-2);
+}
+
+.vfs-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  user-select: none;
+}
+
+.vfs-node:hover {
+  background: var(--color-surface-hover);
+}
+
+.vfs-node.active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.vfs-node.active .vfs-dim,
+.vfs-node.active .badge {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.vfs-node-twist {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.vfs-node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ---- Diff theo dòng ---- */
+.vfs-diff {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.vfs-diff-line {
+  display: grid;
+  grid-template-columns: 40px 40px 16px 1fr;
+  white-space: pre;
+}
+
+.vfs-diff-line > span:nth-child(-n + 2) {
+  color: var(--color-text-muted);
+  text-align: right;
+  padding-right: 6px;
+  user-select: none;
+}
+
+.vfs-diff-add {
+  background: var(--color-success-soft);
+}
+
+.vfs-diff-del {
+  background: var(--color-danger-soft);
+}
+
+.vfs-diff-add > span:nth-child(3) {
+  color: var(--color-success);
+}
+
+.vfs-diff-del > span:nth-child(3) {
+  color: var(--color-danger);
+}
+
+.vfs-diff-skip {
+  color: var(--color-text-muted);
+}
+
+/* ---- Trình sửa ---- */
+.vfs-editor {
+  min-height: 340px;
+  line-height: 1.5;
+  tab-size: 4;
+}
+
+/* ---- Nhị phân: hex dump + ảnh preview ---- */
+.vfs-hex {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2);
+  overflow: auto;
+  max-height: 320px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.vfs-preview-img {
+  max-width: 100%;
+  max-height: 260px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+}
+
+/* ---- Khối phụ trong tab Thuật toán ---- */
+.vfs-sub {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+  color: var(--color-text);
+}
+
+.vfs-sub-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* ---- Dòng revision trong Lịch sử ---- */
+.vfs-rev {
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--font-size-sm);
+  flex-wrap: wrap;
+}
+
+.vfs-rev:hover {
+  background: var(--color-surface-hover);
+}
+
+.vfs-rev.active {
+  outline: 1px solid var(--color-accent);
+}
+
+/* ---- Bảng cuộn ngang ---- */
+.vfs-tblwrap {
+  overflow-x: auto;
+}
+
+/* ---- Toast ---- */
+.vfs-toasts {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 200;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.vfs-toast {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-success);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-overlay);
+  overflow-wrap: anywhere;
+}
+
+.vfs-toast-info {
+  border-left-color: var(--color-accent);
+}
+
+.vfs-toast-warn {
+  border-left-color: var(--color-warning);
+}
+
+.vfs-toast-error {
+  border-left-color: var(--color-danger);
+}

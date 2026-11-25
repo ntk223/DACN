@@ -11,7 +11,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 
 from sandbox_kit_clone import __version__
@@ -31,12 +32,8 @@ from sandbox_kit_clone.providers.factory import get_provider
 # Tên MCP server hiển thị cho client (Inspector / Claude Code...).
 MCP_SERVER_NAME = "sandbox-kit-clone"
 
-# Trang admin UI (dev tool): file HTML tĩnh nằm cạnh module này.
-ADMIN_HTML_PATH = Path(__file__).parent / "admin.html"
-# Trang quản lý VFS (dev tool): duyệt/sửa file, lịch sử, dấu xóa, thử thuật toán.
-VFS_HTML_PATH = Path(__file__).parent / "vfs.html"
-# Trang quản lý sandbox (dev tool): vòng đời container, file /workspace, log, số liệu.
-SANDBOX_HTML_PATH = Path(__file__).parent / "sandbox.html"
+# Giao diện quản trị (dev tool): SPA React, build sẵn trong ``web/dist`` (make web).
+WEB_DIST_DIR = Path(__file__).parents[3] / "web" / "dist"
 
 
 def create_app(
@@ -76,23 +73,30 @@ def create_app(
 
     @app.get("/admin", include_in_schema=False)
     def admin() -> HTMLResponse:
-        """Bảng điều khiển test API (dev tool) — trang HTML tĩnh."""
-        return HTMLResponse(ADMIN_HTML_PATH.read_text(encoding="utf-8"))
+        """Giao diện quản trị (SPA React — build trong ``web/dist``)."""
+        index = WEB_DIST_DIR / "index.html"
+        if index.is_file():
+            return HTMLResponse(index.read_text(encoding="utf-8"))
+        # Chưa build web (make web) — trả trang nhắc lệnh thay vì 404.
+        return HTMLResponse(
+            "<!doctype html><meta charset='utf-8'><title>Sandbox Kit</title>"
+            "<p style='font-family:system-ui;padding:2rem'>Chưa có bản build giao diện quản trị."
+            "<br>Chạy <code>make web</code> rồi tải lại trang.</p>"
+        )
 
-    @app.get("/admin/vfs", include_in_schema=False)
-    def admin_vfs() -> HTMLResponse:
-        """Trang quản lý VFS (dev tool) — dùng REST ``/admin/api/*``."""
-        return HTMLResponse(VFS_HTML_PATH.read_text(encoding="utf-8"))
-
-    @app.get("/admin/sandboxes", include_in_schema=False)
-    def admin_sandboxes() -> HTMLResponse:
-        """Trang quản lý sandbox (dev tool) — dùng REST ``/admin/api/sandboxes*``."""
-        return HTMLResponse(SANDBOX_HTML_PATH.read_text(encoding="utf-8"))
+    if (WEB_DIST_DIR / "assets").is_dir():
+        app.mount("/admin/assets", StaticFiles(directory=WEB_DIST_DIR / "assets"))
 
     app.include_router(upload_router)
     app.include_router(download_router)
     app.include_router(admin_api_router)
     app.include_router(admin_sandbox_router)
+
+    # Route cũ (/admin/vfs, /admin/sandboxes) — gộp về một trang duy nhất.
+    # Đặt SAU các router /admin/api/* để không nuốt request API.
+    @app.get("/admin/{rest:path}", include_in_schema=False)
+    def admin_legacy(rest: str) -> RedirectResponse:
+        return RedirectResponse("/admin", status_code=302)
     install_error_handlers(app)
     app.mount("/mcp", mcp.streamable_http_app())
     return app

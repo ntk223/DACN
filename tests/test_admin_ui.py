@@ -1,4 +1,9 @@
-"""Kiểm thử bảng điều khiển /admin (W1.5): route HTML tĩnh, không phá tính năng cũ."""
+"""Kiểm thử giao diện quản trị /admin (SPA React, build trong ``web/dist``).
+
+Route cũ của 3 trang riêng (/admin/vfs, /admin/sandboxes) chuyển hướng về /admin.
+Chức năng thật của UI được kiểm qua REST ``/admin/api/*`` (test_admin_vfs,
+test_sandbox_admin) — test này chỉ kiểm việc phục vụ trang và tính ẩn khỏi OpenAPI.
+"""
 
 from __future__ import annotations
 
@@ -9,26 +14,8 @@ from fastapi.testclient import TestClient
 
 from sandbox_kit_clone import __version__
 from sandbox_kit_clone.config import Settings
-from sandbox_kit_clone.gateway.app import create_app
+from sandbox_kit_clone.gateway.app import WEB_DIST_DIR, create_app
 from sandbox_kit_clone.providers.fake import FakeProvider
-
-# Đủ 14 tool MCP phải xuất hiện trong trang admin (metadata JS sinh form).
-TOOL_NAMES = [
-    "workspace_create",
-    "sandbox_start",
-    "sandbox_stop",
-    "sandbox_pause",
-    "sandbox_resume",
-    "sandbox_renew",
-    "sandbox_status",
-    "file_write",
-    "file_read",
-    "file_edit",
-    "file_delete",
-    "file_list",
-    "command_run",
-    "sync_status",
-]
 
 
 def _app(tmp_path: Path):
@@ -43,14 +30,38 @@ def client(tmp_path: Path) -> TestClient:
     return TestClient(_app(tmp_path))
 
 
-def test_admin_serves_html_with_all_14_tools(client: TestClient) -> None:
+def _dist_built() -> bool:
+    return (WEB_DIST_DIR / "index.html").is_file()
+
+
+@pytest.mark.skipif(not _dist_built(), reason="chưa build web (make web)")
+def test_admin_serves_spa(client: TestClient) -> None:
+    """/admin trả index.html của SPA; asset nằm cạnh trong /admin/assets."""
     res = client.get("/admin")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]
-    body = res.text
-    assert "Sandbox Kit Clone" in body
-    for name in TOOL_NAMES:
-        assert name in body, f"Trang admin thiếu tool '{name}'"
+    assert "Sandbox Kit" in res.text  # <title> của index.html
+
+
+def test_admin_without_dist_returns_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Chưa build web → /admin vẫn 200 với trang nhắc ``make web``."""
+    monkeypatch.setattr(
+        "sandbox_kit_clone.gateway.app.WEB_DIST_DIR", tmp_path / "khong-ton-tai"
+    )
+    client = TestClient(_app(tmp_path))
+    res = client.get("/admin")
+    assert res.status_code == 200
+    assert "make web" in res.text
+
+
+def test_legacy_admin_routes_redirect(client: TestClient) -> None:
+    """Route cũ của 3 trang riêng → 302 về /admin, không lộ trong OpenAPI."""
+    for path in ("/admin/vfs", "/admin/sandboxes"):
+        res = client.get(path, follow_redirects=False)
+        assert res.status_code == 302
+        assert res.headers["location"] == "/admin"
+    openapi = client.get("/openapi.json").json()
+    assert not any(p.startswith("/admin") for p in openapi["paths"])
 
 
 def test_admin_route_does_not_break_health(client: TestClient) -> None:
@@ -59,5 +70,3 @@ def test_admin_route_does_not_break_health(client: TestClient) -> None:
     res = client.get("/health")
     assert res.status_code == 200
     assert res.json() == {"status": "ok", "version": __version__}
-    openapi = client.get("/openapi.json").json()
-    assert "/admin" not in openapi["paths"]  # include_in_schema=False

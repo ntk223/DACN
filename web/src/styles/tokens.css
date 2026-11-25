@@ -1,0 +1,58 @@
+/**
+ * DESIGN TOKENS — nguồn sự thật duy nhất về màu/kích thước cho cả app.
+ * Theme SÁNG dịu. Không có dark mode.
+ * Quy ước đặt tên: --color-<vai trò>[-<trạng thái>], --radius-*, --shadow-*, --space-*.
+ * Agent feature: CHỈ dùng biến dưới đây, không hardcode màu trong CSS của feature.
+ */
+:root {
+  /* ---- Nền & bề mặt ---- */
+  --color-bg: #f4f6f8;            /* nền app */
+  --color-surface: #ffffff;       /* card, sidebar, header */
+  --color-surface-hover: #eef2f6; /* nền hover các mục */
+  --color-border: #e3e8ee;
+
+  /* ---- Chữ ---- */
+  --color-text: #1f2937;
+  --color-text-muted: #64748b;
+
+  /* ---- Accent (xanh dương) ---- */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-soft: #eff6ff;   /* nền nhạt: mục active, badge xanh dương */
+
+  /* ---- Trạng thái ---- */
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+
+  /* ---- Bo góc ---- */
+  --radius-card: 10px;
+  --radius-control: 8px;
+
+  /* ---- Đổ bóng rất nhẹ ---- */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-overlay: 0 8px 24px rgba(16, 24, 40, 0.14); /* modal/popover */
+
+  /* ---- Font ---- */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo,
+    Consolas, monospace;
+  --font-size-base: 14px;
+  --font-size-sm: 12px;
+  --font-size-lg: 16px;
+
+  /* ---- Kích thước layout ---- */
+  --sidebar-width: 220px;
+  --header-height: 48px;
+
+  /* ---- Spacing ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}

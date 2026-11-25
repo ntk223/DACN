@@ -12,7 +12,8 @@ src/sandbox_kit_clone/
 ├── system/     # DB hệ thống: schema + SystemStore (workspaces/sessions/ops)
 ├── providers/  # ABC SandboxProvider + FakeProvider (in-memory) + DockerProvider + factory
 ├── manager/    # Manager: điều phối workspace/session/sandbox
-└── gateway/    # FastAPI app: MCP mount /mcp, upload/download, health
+└── gateway/    # FastAPI app: MCP mount /mcp, upload/download, health, serve /admin
+web/               # giao diện quản trị React (Vite + TS) — build ra web/dist (make web)
 sandbox-image/Dockerfile           # image sandbox (make image)
 scripts/smoke_mcp_client.py        # smoke test bằng MCP client SDK thật
 ```
@@ -21,6 +22,7 @@ scripts/smoke_mcp_client.py        # smoke test bằng MCP client SDK thật
 
 ```bash
 make test; make lint   # pytest + ruff check src tests
+make web      # build giao diện quản trị React (web/dist) — cần Node.js
 make seed     # tạo DB + workspace mẫu cho từng thuật toán VFS (tự kiểm ✓/✗)
 make run      # server tại http://127.0.0.1:8000
 python3 scripts/smoke_mcp_client.py    # smoke qua MCP thật (server phải đang chạy)
@@ -54,6 +56,7 @@ make test-docker  # test trên Docker thật (bộ test thường tự bỏ qua 
 | `SANDBOX_KIT_SANDBOX_NETWORK` | `true` | `false` → container không ra mạng (khi đó chưa chạy lệnh được) |
 | `SANDBOX_KIT_FAKE_EXEC_HOST` | `false` | bộ giả lập: `true` → `command_run` chạy lệnh THẬT trên máy host (không cô lập — chỉ dev/test) |
 | `SANDBOX_KIT_COMMAND_TIMEOUT_DEFAULT` / `_MAX` | `120` / `600` | giới hạn thời gian mỗi lệnh (giây) |
+| `SANDBOX_KIT_POLICY_MODE` / `_POLICY_LAYER2_MODE` | `audit` / `audit` | bộ chặn lớp 1 / lớp 2: `audit` (cảnh báo) hoặc `enforce` (chặn) |
 
 Mỗi sandbox = 1 container `skc-…` + 1 volume `skc-vol-{session}` gắn `/workspace`, mang label
 `sandbox-kit=1`. Khi bật, toàn bộ file trong VFS được xuất ra volume (đánh dấu `synced_sha256`,
@@ -61,21 +64,34 @@ mốc đồng bộ = revision hiện tại). Dừng = xóa cả container lẫn 
 Container chạy trình thực thi gRPC (`python -m sandbox_kit_clone.agent`, cổng 50051 chỉ ánh xạ ra
 `127.0.0.1`); `command_run` gửi lệnh `bash -lc` vào đó, output về dần theo thời gian thực.
 `/scratch` là tmpfs 256MB. Sửa `agent/proto/sandbox_agent.proto` → `make proto` rồi `make image`.
-**Chưa có:** đẩy file ghi qua MCP *sau khi* bật sandbox vào sandbox — sandbox chỉ có file tại lúc bật.
+Trước mỗi lệnh, thay đổi trong kho (ghi / sửa / xóa qua MCP) được tự đẩy vào sandbox và sandbox xác
+nhận từng file; chưa xong → `sync_unavailable`, lệnh không chạy. Bộ chặn lệnh 2 lớp kiểm lệnh trước
+(lớp 1 lệnh phá hoại, lớp 2 shell tự ghi/xóa file) — mặc định chỉ cảnh báo, `enforce` để chặn hẳn.
+**Chưa có (tuần 3):** nhận file do lệnh tạo / sửa trong sandbox về kho.
 
 ## Giao diện quản trị (dev tool)
 
-- `/admin/vfs` — **quản lý VFS**: danh sách workspace + hạn mức, cây file (nhãn blob / nhị phân),
-  sửa & lưu (Ctrl+S), sửa khớp mờ (old_text tự lấy từ file hoặc đoạn đang chọn) có xem trước diff, đổi tên, xóa, upload (file lớn tự đi
-  đường chunk), lịch sử có diff + khôi phục, dấu xóa, sổ thao tác, tab **Thuật toán** chạy thử
-  chuẩn hóa đường dẫn / quy tắc không lưu / khớp mờ mà không ghi gì. Phím tắt: `N` file mới, `R` tải lại.
-- `/admin/sandboxes` — **quản lý sandbox**: bật (TTL / CPU / RAM) · tạm dừng · tiếp tục · gia hạn ·
+Một trang duy nhất `/admin` (React, theme sáng) — sidebar 3 mục:
+
+- **Tổng quan** — dashboard (workspace/phiên/sandbox), console gọi thử 14 tool MCP qua
+  `/mcp` (form sinh theo metadata, chọn phiên dùng chung), tải lên/tải xuống (file lớn
+  tự đi đường chunk).
+- **VFS** — quản lý kho file: danh sách workspace + hạn mức, cây file (nhãn blob / nhị phân),
+  sửa & lưu (Ctrl+S), sửa khớp mờ (old_text tự lấy từ file hoặc đoạn đang chọn) có xem trước
+  diff, đổi tên, xóa, upload (file lớn tự đi đường chunk), lịch sử có diff + khôi phục, dấu xóa,
+  sổ thao tác, tab **Thuật toán** chạy thử chuẩn hóa đường dẫn / quy tắc không lưu / khớp mờ mà
+  không ghi gì. Phím tắt: `N` file mới, `R` tải lại.
+- **Sandbox** — quản lý sandbox: bật (TTL / CPU / RAM) · tạm dừng · tiếp tục · gia hạn ·
   dừng & xóa theo từng phiên; cảnh báo "lệch sổ" khi trạng thái ghi trong DB khác thực tế; danh sách
   sandbox mồ côi + nút dọn; chi tiết container (cổng, volume, giới hạn, CPU/RAM), duyệt và đọc file
-  trong `/workspace`, xem log, **khung chạy lệnh** (output hiện dần, Enter để chạy, ↑/↓ lịch sử).
-  Tự làm mới mỗi 5 giây.
-- `/admin` — console gọi thử 14 tool MCP + REST upload/download.
-- Cả hai dùng REST `/admin/api/*` (không có trong OpenAPI, **không xác thực** — chỉ chạy ở localhost).
+  trong `/workspace`, xem log, **khung chạy lệnh** (output hiện dần, Enter để chạy, ↑/↓ lịch sử),
+  trạng thái đồng bộ, nút đồng bộ ngay / đồng bộ lại toàn bộ / so sánh kho ↔ sandbox, kiểm tra lệnh
+  với bộ chặn mà không chạy. Tự làm mới mỗi 5 giây.
+
+Mã nguồn UI ở `web/` (Vite + React + TS; `features/overview|vfs|sandbox`, design tokens ở
+`web/src/styles/tokens.css`); build vào `web/dist` — server phục vụ thẳng. Route cũ
+`/admin/vfs`, `/admin/sandboxes` chuyển hướng về `/admin`. REST `/admin/api/*` **không có
+trong OpenAPI, không xác thực — chỉ chạy ở localhost**.
 
 ## Kết nối MCP Inspector
 

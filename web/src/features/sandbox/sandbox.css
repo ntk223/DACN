@@ -1,0 +1,251 @@
+/**
+ * sandbox.css — style riêng cho feature Sandbox.
+ * CHỈ dùng biến từ styles/tokens.css, không hardcode màu.
+ */
+
+/* ---- Layout 2 cột: bảng phiên (trái) + chi tiết (phải) ---- */
+.sbx-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .sbx-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sbx-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* ---- Hàng meta nhỏ ---- */
+.sbx-meta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.sbx-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---- Table ---- */
+.sbx-table th,
+.sbx-table td {
+  vertical-align: middle;
+}
+
+.sbx-table tbody tr {
+  cursor: pointer;
+}
+
+.sbx-table tbody tr.sbx-selected {
+  background: var(--color-accent-soft);
+}
+
+.sbx-mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+/* ---- Thông tin chi tiết dạng key/value ---- */
+.sbx-kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.sbx-kv dt {
+  color: var(--color-text-muted);
+}
+
+.sbx-kv dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+/* ---- Thanh meter RAM ---- */
+.sbx-meter {
+  height: 6px;
+  background: var(--color-surface-hover);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: var(--space-1);
+}
+
+.sbx-meter > div {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+/* ---- Terminal exec ---- */
+.sbx-term {
+  margin: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  min-height: 140px;
+  max-height: 380px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sbx-term .ln-cmd {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.sbx-term .ln-err {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.sbx-term .ln-meta {
+  color: var(--color-text-muted);
+}
+
+.sbx-term .ln-ok {
+  color: var(--color-success);
+}
+
+.sbx-term .ln-warn {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+/* ---- Danh sách file /workspace ---- */
+.sbx-files {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.sbx-file {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.sbx-file:hover {
+  background: var(--color-surface-hover);
+}
+
+.sbx-file.sbx-file-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.sbx-file .sbx-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Khung pre xem file / log ---- */
+.sbx-pre {
+  margin: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sbx-orphan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.sbx-orphan:hover {
+  background: var(--color-surface-hover);
+}
+
+.sbx-orphan-active {
+  border-color: var(--color-accent);
+}
+
+/* ---- Input lệnh exec ---- */
+.sbx-cmdline {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--font-mono);
+}
+
+.sbx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sbx-toolbar .spacer {
+  flex: 1;
+}
+
+/* ---- Bảng so sánh đồng bộ ---- */
+.sbx-compare-path {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+/* ---- Toast ---- */
+.sbx-toasts {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 200;
+  max-width: min(440px, calc(100vw - 32px));
+}
+
+.sbx-toast {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-success);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-overlay);
+}
+
+.sbx-toast-err {
+  border-left-color: var(--color-danger);
+}
+
+.sbx-toast-warn {
+  border-left-color: var(--color-warning);
+}

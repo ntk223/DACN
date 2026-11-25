@@ -1,6 +1,12 @@
-.PHONY: all test lint run run-docker image proto test-docker clean init-db seed seed-big reset-db
+.PHONY: all test lint run run-docker image proto test-docker clean init-db seed seed-big reset-db web web-dev
 
 all: lint test
+
+web:      ## build giao diện quản trị React (web/dist)
+	cd web && npm install && npm run build
+
+web-dev:  ## dev server React (proxy API về :8000, server Python phải đang chạy)
+	cd web && npm run dev
 
 test:
 	PYTHONPATH=src pytest tests/ -q

@@ -20,7 +20,7 @@ def main() -> None:
     print(f"  - MCP endpoint : {base}/mcp   (transport streamable-http)")
     print(f"  - Upload       : {base}/upload")
     print(f"  - Health       : {base}/health")
-    print(f"  - Quản trị     : {base}/admin/vfs · {base}/admin/sandboxes")
+    print(f"  - Quản trị     : {base}/admin")
     print(f"  - Provider     : {settings.provider} (image {settings.sandbox_image})")
     print(f"  - Thư mục dữ liệu: {Path(settings.data_dir).resolve()}")
     uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")

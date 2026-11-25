@@ -1,0 +1,164 @@
+/**
+ * overview.css — style riêng cho module Overview/Console.
+ * CHỈ dùng biến từ tokens.css, không hardcode màu.
+ */
+
+/* ---- Bố cục trang ---- */
+.ov-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---- Lưới card thống kê ---- */
+.ov-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.ov-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ov-stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---- Bảng cuộn ngang ---- */
+.ov-table-wrap {
+  overflow-x: auto;
+}
+
+/* ---- Console MCP: sidebar trái + panel phải ---- */
+.ov-console {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .ov-console {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ov-tool-group-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.ov-tool-group-label:first-child {
+  margin-top: 0;
+}
+
+.ov-tool-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  transition: background 0.12s ease;
+}
+
+.ov-tool-btn:hover {
+  background: var(--color-surface-hover);
+}
+
+.ov-tool-btn.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.ov-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ov-form-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.ov-form-endpoint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---- Alert lỗi trong panel (không dùng window.alert) ---- */
+.ov-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  word-break: break-word;
+}
+
+/* ---- Khung kết quả mono ---- */
+.ov-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ov-pre {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 420px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ov-pre.is-error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+/* ---- Tiến trình upload ---- */
+.ov-progress {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.ov-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface-hover);
+  overflow: hidden;
+}
+
+.ov-progress-bar > div {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.15s ease;
+}
