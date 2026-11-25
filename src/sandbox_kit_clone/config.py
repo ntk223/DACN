@@ -52,7 +52,8 @@ class Settings:
     inline_max_bytes: int = 3_145_728          # ~3MB: ngưỡng file lớn đi đường upload riêng
     blob_sidecar_min_bytes: int = 33_554_432   # 32MB: ngưỡng lưu thành file rời
     workspace_quota_bytes: int = 2_147_483_648  # 2GB hard quota per workspace
-    policy_mode: str = "audit"                 # audit | enforce
+    policy_mode: str = "audit"                 # bộ chặn lớp 1 (lệnh phá hoại): audit | enforce
+    policy_layer2_mode: str = "audit"          # bộ chặn lớp 2 (shell tự ghi/xóa file): audit | enforce
     staging_max_age_hours: int = 24            # tự dọn staging/upload quá hạn
     host: str = "127.0.0.1"
     port: int = 8000
@@ -72,6 +73,8 @@ class Settings:
                 f"policy_mode phải là một trong {_VALID_POLICY_MODES}, "
                 f"nhận được: {self.policy_mode!r}"
             )
+        if self.policy_layer2_mode not in _VALID_POLICY_MODES:
+            raise ValueError(f"policy_layer2_mode phải là một trong {_VALID_POLICY_MODES}")
         if self.provider not in _VALID_PROVIDERS:
             raise ValueError(
                 f"provider phải là một trong {_VALID_PROVIDERS}, nhận được: {self.provider!r}"
@@ -87,6 +90,7 @@ def get_settings() -> Settings:
         blob_sidecar_min_bytes=_env_int(f"{ENV_PREFIX}BLOB_SIDECAR_MIN_BYTES", 33_554_432),
         workspace_quota_bytes=_env_int(f"{ENV_PREFIX}WORKSPACE_QUOTA_BYTES", 2_147_483_648),
         policy_mode=_env_str(f"{ENV_PREFIX}POLICY_MODE", "audit"),
+        policy_layer2_mode=_env_str(f"{ENV_PREFIX}POLICY_LAYER2_MODE", "audit"),
         staging_max_age_hours=_env_int(f"{ENV_PREFIX}STAGING_MAX_AGE_HOURS", 24),
         host=_env_str(f"{ENV_PREFIX}HOST", "127.0.0.1"),
         port=_env_int(f"{ENV_PREFIX}PORT", 8000),

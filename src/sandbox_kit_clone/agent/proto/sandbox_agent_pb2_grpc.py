@@ -44,6 +44,16 @@ class ExecAgentStub:
                 request_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.HealthRequest.SerializeToString,
                 response_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.HealthReply.FromString,
                 _registered_method=True)
+        self.SyncFiles = channel.stream_unary(
+                '/sandbox_kit.agent.v1.ExecAgent/SyncFiles',
+                request_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.SyncMessage.SerializeToString,
+                response_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.SyncReply.FromString,
+                _registered_method=True)
+        self.ListFiles = channel.unary_stream(
+                '/sandbox_kit.agent.v1.ExecAgent/ListFiles',
+                request_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.ListRequest.SerializeToString,
+                response_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.FileEntry.FromString,
+                _registered_method=True)
 
 
 class ExecAgentServicer:
@@ -63,6 +73,21 @@ class ExecAgentServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SyncFiles(self, request_iterator, context):
+        """Nhận một loạt thao tác file: mỗi file = FileStart, các đoạn data, FileEnd; xóa = Delete.
+        Ghi ra file tạm → kiểm sha256 → đổi tên (nguyên tử). Trả xác nhận cho TỪNG thao tác.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListFiles(self, request, context):
+        """Liệt kê file trong workspace (bỏ qua các thư mục trong exclude_dirs).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ExecAgentServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -75,6 +100,16 @@ def add_ExecAgentServicer_to_server(servicer, server):
                     servicer.Healthcheck,
                     request_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.HealthRequest.FromString,
                     response_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.HealthReply.SerializeToString,
+            ),
+            'SyncFiles': grpc.stream_unary_rpc_method_handler(
+                    servicer.SyncFiles,
+                    request_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.SyncMessage.FromString,
+                    response_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.SyncReply.SerializeToString,
+            ),
+            'ListFiles': grpc.unary_stream_rpc_method_handler(
+                    servicer.ListFiles,
+                    request_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.ListRequest.FromString,
+                    response_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.FileEntry.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -131,6 +166,60 @@ class ExecAgent:
             '/sandbox_kit.agent.v1.ExecAgent/Healthcheck',
             sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.HealthRequest.SerializeToString,
             sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.HealthReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SyncFiles(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_unary(
+            request_iterator,
+            target,
+            '/sandbox_kit.agent.v1.ExecAgent/SyncFiles',
+            sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.SyncMessage.SerializeToString,
+            sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.SyncReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListFiles(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/sandbox_kit.agent.v1.ExecAgent/ListFiles',
+            sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.ListRequest.SerializeToString,
+            sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.FileEntry.FromString,
             options,
             channel_credentials,
             insecure,

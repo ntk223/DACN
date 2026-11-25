@@ -19,6 +19,8 @@ class ErrorCode(str, Enum):
     provider_unavailable = "provider_unavailable"
     agent_unavailable = "agent_unavailable"
     capability_unavailable = "capability_unavailable"
+    sync_unavailable = "sync_unavailable"
+    command_blocked = "command_blocked"
     internal_error = "internal_error"
 
 

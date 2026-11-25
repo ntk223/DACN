@@ -105,6 +105,22 @@ def test_command_run_inside_container(manager: Manager) -> None:
     manager.sandbox_stop(sid)
 
 
+def test_push_before_command_in_container(manager: Manager) -> None:
+    """Gate W2 trên Docker: ghi SAU khi bật → lệnh kế tiếp thấy; xóa trong kho → mất trong sandbox."""
+    sid = _workspace(manager)
+    manager.sandbox_start(sid, ttl_seconds=600)
+    _w, vfs = manager.resolve_session(sid)
+    vfs.write_file("src/app.py", "print('bản mới')\n")
+    vfs.write_file("docs/n.md", "# mới\n")
+    vfs.delete_file("data/b.bin")
+    vfs.close()
+    r = manager.command_run(sid, "python3 src/app.py && find . -type f | sort")
+    assert r["stdout"] == "bản mới\n./docs/n.md\n./src/app.py\n"
+    assert (r["sync"]["put"], r["sync"]["deleted"]) == (2, 1)
+    assert manager.sandbox_compare(sid)["in_sync"] is True
+    manager.sandbox_stop(sid)
+
+
 def test_orphan_is_listed_and_cleaned(manager: Manager) -> None:
     provider = manager.provider
     manager._test_sessions.append("orphan-session")  # type: ignore[attr-defined]

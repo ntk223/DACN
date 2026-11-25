@@ -165,12 +165,17 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
     ) -> dict:
         """Chạy lệnh shell (bash -lc) trong sandbox của phiên — sandbox phải đang RUNNING.
 
+        Trước khi chạy: (1) bộ chặn lệnh 2 lớp kiểm lệnh — lớp 1 lệnh phá hoại, lớp 2 shell tự
+        ghi/xóa file; chế độ audit chỉ cảnh báo (policy.warnings), enforce trả command_blocked;
+        (2) mọi thay đổi file_write/file_edit/file_delete chưa có trong sandbox được đẩy vào và
+        sandbox xác nhận từng file (kết quả ở "sync"); chưa xong → sync_unavailable, lệnh KHÔNG chạy.
         cwd tương đối với /workspace; timeout_seconds 0 = mặc định (120s), tối đa 600s — hết giờ
         thì cả nhóm tiến trình bị kill và trả timed_out=true. Output được gửi DẦN trong lúc chạy
         qua log notification (logger "stdout" / "stderr"); kết quả cuối có exit_code, stdout,
         stderr (mỗi luồng giữ tối đa 1MB phần cuối, truncated=true nếu bị cắt), duration_ms.
-        Lưu ý: file ghi qua file_write SAU khi bật sandbox chưa được đẩy vào sandbox (làm sau).
+        File do lệnh tạo/sửa trong sandbox CHƯA được nhận về kho (tuần 3).
         """
+
         buffer = _OutputBuffer()
         result: dict = {}
 
@@ -213,7 +218,8 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
 
     @mcp.tool()
     def sync_status(session_id: str) -> dict:
-        """Xem trạng thái đồng bộ kho ↔ sandbox (W1: revision + status đặt sẵn)."""
+        """Trạng thái đồng bộ kho → sandbox: workspace_revision, synced_revision (mốc sandbox đã
+        xác nhận), pending_push (số file/xóa chưa vào sandbox — được đẩy tự động ở command_run kế)."""
         return _safe(lambda: manager.sync_status(session_id))
 
     tools["sync_status"] = sync_status

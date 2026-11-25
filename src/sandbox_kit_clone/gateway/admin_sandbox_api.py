@@ -34,6 +34,14 @@ class RenewBody(BaseModel):
     ttl_seconds: int = 3600
 
 
+class SyncBody(BaseModel):
+    full: bool = False
+
+
+class PolicyBody(BaseModel):
+    command: str
+
+
 class ExecBody(BaseModel):
     command: str
     cwd: str = ""
@@ -67,6 +75,11 @@ def overview(request: Request) -> dict:
     for row in data["sessions"]:
         meta = labels.get(row["workspace_id"], {})
         row["workspace_name"] = meta.get("name")
+        if row["state"] in ("RUNNING", "PAUSED"):
+            try:
+                row["sync"] = manager.sync_status(row["session_id"])
+            except AppError:
+                row["sync"] = None
     return data
 
 
@@ -100,6 +113,7 @@ def exec_command(request: Request, session_id: str, body: ExecBody) -> Streaming
                 env=body.env or None,
                 timeout_seconds=body.timeout_seconds or None,
                 on_output=on_output,
+                on_prepared=lambda info: events.put({"type": "prepared", **info}),
             )
             events.put({"type": "result", **result})
         except AppError as exc:
@@ -119,6 +133,24 @@ def exec_command(request: Request, session_id: str, body: ExecBody) -> Streaming
             yield json.dumps(item, ensure_ascii=False) + "\n"
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@admin_sandbox_router.post("/sessions/{session_id}/sync")
+def sync_push(request: Request, session_id: str, body: SyncBody | None = None) -> dict:
+    """Đẩy thay đổi VFS vào sandbox ngay (``full`` = gửi lại toàn bộ)."""
+    return _manager(request).sync_push(session_id, full=bool(body and body.full))
+
+
+@admin_sandbox_router.get("/sessions/{session_id}/compare")
+def compare(request: Request, session_id: str) -> dict:
+    """So kho với /workspace thật của sandbox theo sha256."""
+    return _manager(request).sync_status(session_id) | _manager(request).sandbox_compare(session_id)
+
+
+@admin_sandbox_router.post("/algo/policy")
+def check_policy(request: Request, body: PolicyBody) -> dict:
+    """Chạy thử bộ chặn lệnh (không chạy lệnh)."""
+    return _manager(request).check_command(body.command)
 
 
 @admin_sandbox_router.post("/sessions/{session_id}/{action}")

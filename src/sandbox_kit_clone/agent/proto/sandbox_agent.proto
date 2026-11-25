@@ -1,5 +1,5 @@
 // Giao thức Manager ↔ trình thực thi trong sandbox (mcp-integration §3.9).
-// W2: Exec + Healthcheck. SyncFiles / ListFiles bổ sung khi làm đồng bộ (W3).
+// W2: Exec, SyncFiles (nhận file + xác nhận từng file), ListFiles (danh sách + sha256), Healthcheck.
 syntax = "proto3";
 
 package sandbox_kit.agent.v1;
@@ -9,6 +9,63 @@ service ExecAgent {
   rpc Exec(ExecRequest) returns (stream ExecEvent);
   // Agent còn sống và sẵn sàng nhận lệnh.
   rpc Healthcheck(HealthRequest) returns (HealthReply);
+  // Nhận một loạt thao tác file: mỗi file = FileStart, các đoạn data, FileEnd; xóa = Delete.
+  // Ghi ra file tạm → kiểm sha256 → đổi tên (nguyên tử). Trả xác nhận cho TỪNG thao tác.
+  rpc SyncFiles(stream SyncMessage) returns (SyncReply);
+  // Liệt kê file trong workspace (bỏ qua các thư mục trong exclude_dirs).
+  rpc ListFiles(ListRequest) returns (stream FileEntry);
+}
+
+message SyncMessage {
+  oneof msg {
+    FileStart start = 1;
+    bytes data = 2;                  // đoạn nội dung của file đang mở (≤ 1MB / đoạn)
+    FileEnd end = 3;
+    Delete delete = 4;
+  }
+}
+
+message FileStart {
+  string path = 1;                 // tương đối với gốc workspace, đã chuẩn hóa
+  int64 size = 2;
+  string sha256 = 3;               // agent kiểm lại sau khi nhận đủ
+}
+
+message FileEnd {}
+
+message Delete {
+  string path = 1;
+}
+
+message FileAck {
+  enum Op {
+    PUT = 0;
+    DELETE = 1;
+  }
+  string path = 1;
+  Op op = 2;
+  bool ok = 3;
+  string sha256 = 4;               // sha thật của file đã ghi
+  string error = 5;
+}
+
+message SyncReply {
+  repeated FileAck acks = 1;
+  int64 bytes_written = 2;
+  int64 duration_ms = 3;
+}
+
+message ListRequest {
+  repeated string exclude_dirs = 1; // tên thư mục bỏ qua ở mọi độ sâu (node_modules, .venv...)
+  bool with_sha256 = 2;
+  int32 limit = 3;                  // 0 = không giới hạn
+}
+
+message FileEntry {
+  string path = 1;
+  int64 size = 2;
+  string sha256 = 3;
+  int64 mtime_ns = 4;
 }
 
 message ExecRequest {

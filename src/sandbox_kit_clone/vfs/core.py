@@ -225,6 +225,68 @@ class VFS:
                 "UPDATE files SET synced_sha256 = ? WHERE path = ?", (sha256, canonical)
             )
 
+    def set_synced_many(self, pairs: list[tuple[str, str]]) -> None:
+        """Ghi ``synced_sha256`` cho nhiều file trong MỘT transaction (Tx-A của push-ack)."""
+        if not pairs:
+            return
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                self._conn.executemany(
+                    "UPDATE files SET synced_sha256 = ? WHERE path = ?", [(sha, p) for p, sha in pairs]
+                )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._safe_rollback()
+                raise
+
+    # ------------------------------------------------------------------- đồng bộ
+
+    def push_candidates(self, since_rev: int, full: bool = False) -> tuple[list[str], list[str]]:
+        """File cần đẩy vào sandbox + đường dẫn cần xóa trong sandbox (design-01 §6.2).
+
+        - put: ``synced_sha256`` khác ``sha256`` — sandbox chưa có đúng bản này (``full`` → mọi file).
+        - delete: dấu xóa ``rev > since_rev`` (``full`` → mọi dấu xóa) mà hiện KHÔNG có file
+          cùng đường dẫn (file đã được ghi lại sau khi xóa thì không xóa nữa).
+        """
+        with self._lock:
+            if full:
+                puts = self._conn.execute("SELECT path FROM files ORDER BY path").fetchall()
+                dels = self._conn.execute(
+                    "SELECT path FROM tombstones WHERE path NOT IN (SELECT path FROM files) ORDER BY path"
+                ).fetchall()
+            else:
+                # Bỏ file đã có đúng bản trong sandbox (synced_sha256 == sha256) dù rev mới hơn
+                # mốc — vd lần push trước bị dở: chỉ gửi lại phần còn thiếu (design-01 §6.2).
+                puts = self._conn.execute(
+                    "SELECT path FROM files WHERE synced_sha256 IS NULL OR synced_sha256 != sha256"
+                    " ORDER BY path"
+                ).fetchall()
+                dels = self._conn.execute(
+                    "SELECT path FROM tombstones WHERE rev > ?"
+                    " AND path NOT IN (SELECT path FROM files) ORDER BY path",
+                    (since_rev,),
+                ).fetchall()
+        return [r["path"] for r in puts], [r["path"] for r in dels]
+
+    def read_for_push(self, path: str) -> dict | None:
+        """Nội dung + sha256 đọc CÙNG lúc (không lệch nhau nếu file đang bị ghi); None nếu đã xóa.
+
+        File rời trả ``blob_path`` thay vì nội dung (đọc theo luồng — nội dung cố định theo sha).
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT content, sha256, size, storage_class, blob_ref FROM files WHERE path = ?", (path,)
+            ).fetchone()
+        if row is None:
+            return None
+        out = {"path": path, "sha256": row["sha256"], "size": row["size"], "content": None, "blob_path": None}
+        if row["storage_class"] == "blob" and row["blob_ref"]:
+            out["blob_path"] = self.blobs.path_of(row["blob_ref"])
+        else:
+            out["content"] = bytes(row["content"] or b"")
+        return out
+
     # -------------------------------------------------------------------- reads
 
     def read_file(self, path: str) -> bytes:

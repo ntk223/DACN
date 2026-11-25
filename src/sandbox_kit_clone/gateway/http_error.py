@@ -18,6 +18,8 @@ _STATUS_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.quota_exceeded: 413,
     ErrorCode.provider_unavailable: 503,
     ErrorCode.agent_unavailable: 503,
+    ErrorCode.sync_unavailable: 503,
+    ErrorCode.command_blocked: 403,
 }
 
 _HTTP_STATUS_KEY = "http_status"

@@ -18,5 +18,5 @@ RUN mkdir -p /workspace /scratch
 WORKDIR /workspace
 EXPOSE 50051
 
-LABEL sandbox-kit.image="w2" sandbox-kit.agent="w2.1"
+LABEL sandbox-kit.image="w2" sandbox-kit.agent="w2.2"
 CMD ["python", "-m", "sandbox_kit_clone.agent", "--root", "/workspace", "--port", "50051"]

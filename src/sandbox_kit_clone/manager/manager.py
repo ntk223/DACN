@@ -19,10 +19,13 @@ from pathlib import Path
 
 from sandbox_kit_clone.config import Settings
 from sandbox_kit_clone.errors import AppError, ErrorCode
-from sandbox_kit_clone.manager.exec_client import ExecClientPool
+from sandbox_kit_clone.manager.exec_client import ExecClient, ExecClientPool
+from sandbox_kit_clone.policy import command_policy
 from sandbox_kit_clone.providers.base import SandboxProvider
+from sandbox_kit_clone.sync import workspace_sync
 from sandbox_kit_clone.system.store import SystemStore
 from sandbox_kit_clone.vfs.core import VFS
+from sandbox_kit_clone.vfs.ignore import IGNORED_DIR_NAMES, ignore_reason
 from sandbox_kit_clone.vfs.schema import (
     DEFAULT_CONFLICT_POLICY,
     init_workspace_db,
@@ -360,28 +363,14 @@ class Manager:
 
     # -------------------------------------------------------------- lệnh
 
-    def command_run(
-        self,
-        session_id: str,
-        command: str,
-        cwd: str = "",
-        env: dict[str, str] | None = None,
-        timeout_seconds: int | None = None,
-        on_output: Callable[[str, bytes], None] | None = None,
-    ) -> dict:
-        """Chạy lệnh shell trong sandbox của phiên (phải RUNNING); trả kết quả chuẩn hóa.
+    def check_command(self, command: str) -> dict:
+        """Bộ chặn lệnh 2 lớp theo cấu hình (không chạy gì)."""
+        return command_policy.check(
+            command, layer1_mode=self.settings.policy_mode, layer2_mode=self.settings.policy_layer2_mode
+        )
 
-        ``on_output(stream, data)`` được gọi ngay khi có output (để gửi dần cho agent).
-        W2: CHƯA đẩy thay đổi VFS → sandbox trước lệnh — sandbox chỉ có file tại lúc bật.
-        """
-        if not command or not command.strip():
-            raise AppError(ErrorCode.invalid_request, "command không được rỗng")
-        timeout = timeout_seconds or self.settings.command_timeout_default
-        if timeout <= 0 or timeout > self.settings.command_timeout_max:
-            raise AppError(
-                ErrorCode.invalid_request,
-                f"timeout_seconds phải trong 1..{self.settings.command_timeout_max}",
-            )
+    def _running_target(self, session_id: str) -> tuple[dict, str, ExecClient]:
+        """Phiên RUNNING + sandbox có trình thực thi → ``(session, sandbox_id, client)``."""
         session = self.store.get_session(session_id)
         if session is None:
             raise AppError(ErrorCode.session_not_found, f"Session không tồn tại: {session_id!r}")
@@ -389,7 +378,7 @@ class Manager:
             hint = "sandbox_resume" if session["state"] == "PAUSED" else "sandbox_start"
             raise AppError(
                 ErrorCode.invalid_request,
-                f"session đang {session['state']} — cần RUNNING để chạy lệnh (gọi {hint} trước)",
+                f"session đang {session['state']} — cần RUNNING (gọi {hint} trước)",
             )
         sandbox_id = session["sandbox_id"]
         has_agent = getattr(self.provider, "has_exec_agent", None)
@@ -400,11 +389,74 @@ class Manager:
                 " hoặc container Docker không có mạng)",
                 details={"capability": "exec", "provider": getattr(self.provider, "name", "?")},
             )
-        target = self.provider.get_dial_target(sandbox_id)
-        client = self.exec_clients.get(sandbox_id, target)
+        client = self.exec_clients.get(sandbox_id, self.provider.get_dial_target(sandbox_id))
+        return session, sandbox_id, client
+
+    def _push(self, session: dict, sandbox_id: str, client: ExecClient, full: bool = False) -> dict:
+        _ws, vfs = self.resolve_session(session["session_id"])
+        try:
+            return workspace_sync.push(
+                store=self.store,
+                vfs=vfs,
+                client=client,
+                sandbox_id=sandbox_id,
+                workspace_id=session["workspace_id"],
+                full=full,
+            )
+        finally:
+            vfs.close()
+
+    def sync_push(self, session_id: str, full: bool = False) -> dict:
+        """Đẩy thay đổi VFS vào sandbox ngay (không chạy lệnh). ``full`` = gửi lại toàn bộ."""
+        session, sandbox_id, client = self._running_target(session_id)
 
         def _do() -> dict:
             client.wait_ready(timeout=self.settings.agent_ready_timeout)
+            return self._push(session, sandbox_id, client, full=full)
+
+        return self._op("sync_push", session["workspace_id"], sandbox_id, _do)
+
+    def command_run(
+        self,
+        session_id: str,
+        command: str,
+        cwd: str = "",
+        env: dict[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        on_output: Callable[[str, bytes], None] | None = None,
+        on_prepared: Callable[[dict], None] | None = None,
+    ) -> dict:
+        """Chạy lệnh shell trong sandbox của phiên (phải RUNNING); trả kết quả chuẩn hóa.
+
+        Trình tự: bộ chặn lệnh (enforce → ``command_blocked``) → đẩy thay đổi VFS vào sandbox
+        (chưa xong → ``sync_unavailable``, KHÔNG chạy) → chạy. ``on_output(stream, data)`` gọi
+        ngay khi có output (để gửi dần cho agent); ``on_prepared({"sync", "policy"})`` gọi ngay
+        trước khi lệnh chạy.
+        """
+        if not command or not command.strip():
+            raise AppError(ErrorCode.invalid_request, "command không được rỗng")
+        timeout = timeout_seconds or self.settings.command_timeout_default
+        if timeout <= 0 or timeout > self.settings.command_timeout_max:
+            raise AppError(
+                ErrorCode.invalid_request,
+                f"timeout_seconds phải trong 1..{self.settings.command_timeout_max}",
+            )
+        session, sandbox_id, client = self._running_target(session_id)
+        policy = self.check_command(command)
+
+        def _do() -> dict:
+            command_policy.log_decision(session_id, command, policy)
+            if policy["blocked"]:
+                raise AppError(
+                    ErrorCode.command_blocked,
+                    "Lệnh bị bộ chặn từ chối: " + "; ".join(h["message"] for h in policy["hits"]),
+                    details={"policy": policy},
+                )
+            client.wait_ready(timeout=self.settings.agent_ready_timeout)
+            sync = self._push(session, sandbox_id, client)
+            policy_info = {"warnings": policy["warnings"], "modes": policy["modes"]}
+            if on_prepared is not None:
+                on_prepared({"sync": sync, "policy": policy_info})
             result = client.run(
                 command,
                 cwd=cwd,
@@ -424,16 +476,51 @@ class Manager:
                 "stderr_bytes": result.stderr_bytes,
                 "truncated": result.truncated,
                 "sandbox_id": sandbox_id,
-                "sync": {
-                    "pushed": False,
-                    "note": "Chưa đồng bộ VFS → sandbox trước lệnh (làm sau): sandbox chỉ có file tại lúc bật.",
-                },
+                "sync": sync,
+                "policy": policy_info,
             }
             if result.error:
                 out["error_detail"] = result.error
             return out
 
         return self._op("command_run", session["workspace_id"], sandbox_id, _do)
+
+    def sandbox_compare(self, session_id: str) -> dict:
+        """So kho (VFS) với /workspace thật của sandbox theo sha256 — xem đồng bộ đúng chưa.
+
+        Bỏ qua các đường dẫn thuộc vùng "không lưu" (thư viện, build...) ở phía sandbox.
+        """
+        session, _sandbox_id, client = self._running_target(session_id)
+        client.wait_ready(timeout=self.settings.agent_ready_timeout)
+        entries = client.list_files(sorted(IGNORED_DIR_NAMES), with_sha256=True)
+        sandbox = {e["path"]: e for e in entries if ignore_reason(e["path"]) is None}
+        _ws, vfs = self.resolve_session(session_id)
+        try:
+            files = {f["path"]: vfs.get_file_info(f["path"]) for f in vfs.list_files()}
+            revision = vfs.revision
+        finally:
+            vfs.close()
+        same, differ, only_vfs = [], [], []
+        for path, info in files.items():
+            sb = sandbox.get(path)
+            if sb is None:
+                only_vfs.append(path)
+            elif sb["sha256"] == info["sha256"]:
+                same.append(path)
+            else:
+                differ.append({"path": path, "vfs_sha256": info["sha256"], "sandbox_sha256": sb["sha256"]})
+        only_sandbox = [{"path": p, "size": e["size"]} for p, e in sorted(sandbox.items()) if p not in files]
+        state = self.store.get_sync_state(session["sandbox_id"]) or {}
+        return {
+            "revision": revision,
+            "watermark": state.get("last_synced_revision"),
+            "status": state.get("status"),
+            "same": len(same),
+            "differ": differ,
+            "only_vfs": only_vfs,
+            "only_sandbox": only_sandbox,
+            "in_sync": not differ and not only_vfs,
+        }
 
     # ------------------------------------------------------ quản trị sandbox
 
@@ -520,16 +607,27 @@ class Manager:
     # ------------------------------------------------------------------ sync
 
     def sync_status(self, session_id: str) -> dict:
-        """Trạng thái đồng bộ (W3 hoàn thiện): revision hiện tại + mốc sync nếu có."""
+        """Trạng thái đồng bộ: revision kho, mốc đã vào sandbox, số thay đổi chưa đẩy."""
         _workspace_id, vfs = self.resolve_session(session_id)
         session = self.store.get_session(session_id)
-        sandbox_id = session["sandbox_id"] if session else None
-        status = "syncing"
-        if sandbox_id:
-            sync_row = self.store.get_sync_state(sandbox_id)
-            if sync_row is not None:
-                status = sync_row["status"]
-        return {"workspace_revision": vfs.revision, "status": status, "pending_push": 0}
+        sandbox_id = session["sandbox_id"] if session and session["state"] in ("RUNNING", "PAUSED") else None
+        try:
+            status = "no_sandbox"
+            if sandbox_id:
+                sync_row = self.store.get_sync_state(sandbox_id)
+                status = sync_row["status"] if sync_row is not None else "syncing"
+            info = workspace_sync.pending(self.store, vfs, sandbox_id) if sandbox_id else None
+            return {
+                "workspace_revision": vfs.revision,
+                "status": status,
+                "sandbox_id": sandbox_id,
+                "synced_revision": info["watermark"] if info else None,
+                "pending_push": (info["pending_put"] + info["pending_delete"]) if info else 0,
+                "pending_put": info["pending_put"] if info else 0,
+                "pending_delete": info["pending_delete"] if info else 0,
+            }
+        finally:
+            vfs.close()
 
     # ------------------------------------------------------------- ghi sổ op
 

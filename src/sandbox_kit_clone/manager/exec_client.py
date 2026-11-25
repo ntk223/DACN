@@ -20,7 +20,23 @@ from sandbox_kit_clone.agent.proto import sandbox_agent_pb2_grpc as pb_grpc
 from sandbox_kit_clone.errors import AppError, ErrorCode
 
 READY_TIMEOUT_SECONDS = 90.0
+SYNC_CHUNK = 1024 * 1024  # 1MB mỗi đoạn (dưới giới hạn 4MB của gRPC)
 _RETRYABLE = (grpc.StatusCode.UNAVAILABLE,)
+
+
+@dataclass
+class PutOp:
+    """Ghi một file vào sandbox; ``chunks`` gọi lười để đọc nội dung (file rời đọc theo luồng)."""
+
+    path: str
+    sha256: str
+    size: int
+    chunks: Callable[[], Iterator[bytes]]
+
+
+@dataclass
+class DeleteOp:
+    path: str
 
 
 @dataclass
@@ -151,6 +167,39 @@ class ExecClient:
             stderr_bytes=err.total,
             truncated=out.truncated or err.truncated,
         )
+
+    def sync(self, ops: list, timeout: float = 600.0) -> pb.SyncReply:
+        """Gửi một loạt put/delete; trả xác nhận từng thao tác. Lỗi kênh → ``agent_unavailable``."""
+        try:
+            return self._stub.SyncFiles(_sync_messages(ops), timeout=timeout)
+        except grpc.RpcError as exc:
+            raise AppError(
+                ErrorCode.agent_unavailable, f"Gửi file vào sandbox thất bại: {exc.code().name} {exc.details()}"
+            ) from exc
+
+
+    def list_files(self, exclude_dirs: list[str], with_sha256: bool = True, limit: int = 0) -> list[dict]:
+        try:
+            entries = self._stub.ListFiles(
+                pb.ListRequest(exclude_dirs=exclude_dirs, with_sha256=with_sha256, limit=limit), timeout=120
+            )
+            return [{"path": e.path, "size": e.size, "sha256": e.sha256, "mtime_ns": e.mtime_ns} for e in entries]
+        except grpc.RpcError as exc:
+            raise AppError(
+                ErrorCode.agent_unavailable, f"Không lấy được danh sách file: {exc.code().name} {exc.details()}"
+            ) from exc
+
+
+def _sync_messages(ops: list) -> Iterator[pb.SyncMessage]:
+    for op in ops:
+        if isinstance(op, DeleteOp):
+            yield pb.SyncMessage(delete=pb.Delete(path=op.path))
+            continue
+        yield pb.SyncMessage(start=pb.FileStart(path=op.path, size=op.size, sha256=op.sha256))
+        for chunk in op.chunks():
+            for i in range(0, len(chunk), SYNC_CHUNK):
+                yield pb.SyncMessage(data=chunk[i : i + SYNC_CHUNK])
+        yield pb.SyncMessage(end=pb.FileEnd())
 
 
 class ExecClientPool:
