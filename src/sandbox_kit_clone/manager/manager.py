@@ -35,10 +35,23 @@ from sandbox_kit_clone.vfs.schema import (
 # Số lần thử lại khi workspace_id trùng (xác suất cực hiếm — uuid4().hex[:12]).
 _CREATE_WORKSPACE_RETRIES = 3
 
+# Chờ agent sẵn sàng khi stop: ngắn hơn mặc định (90s) — stop không được treo lâu.
+_STOP_PULL_READY_TIMEOUT = 15.0
+
 
 def _utcnow_iso() -> str:
     """Mốc thời gian chuẩn dùng chung (UTC ISO 8601)."""
     return datetime.now(UTC).isoformat()
+
+
+def _pull_failure_info(exc: AppError) -> dict:
+    """Tóm tắt ngắn một lần pull thất bại (kèm conflicts/failures nếu có) để trả caller."""
+    info: dict = {"code": exc.code.value, "message": exc.message}
+    if exc.details:
+        for key in ("conflicts", "failures"):
+            if exc.details.get(key):
+                info[key] = exc.details[key]
+    return info
 
 
 class Manager:
@@ -240,8 +253,15 @@ class Manager:
             vfs.close()
         return staging, exported, revision
 
-    def sandbox_stop(self, session_id: str) -> dict:
-        """Hủy sandbox + phiên về STANDBY; phải đang RUNNING/PAUSED."""
+    def sandbox_stop(self, session_id: str, force: bool = False) -> dict:
+        """Hủy sandbox + phiên về STANDBY; phải đang RUNNING/PAUSED.
+
+        W3 pull-back: phiên RUNNING thử nhận thay đổi từ sandbox về kho (check-in) TRƯỚC
+        khi hủy. Pull thất bại/bị chặn (vd policy ``error`` gặp xung đột): ``force=False``
+        → từ chối hủy (``conflict`` — dữ liệu còn nguyên trên volume); ``force=True`` →
+        vẫn hủy và bỏ thay đổi (kết quả ghi ``pulled.forced``). Phiên PAUSED không pull
+        được (agent đóng băng) — kết quả ghi ``pulled.skipped = "paused"`` để caller biết.
+        """
         session = self.store.get_session(session_id)
         if session is None:
             raise AppError(ErrorCode.session_not_found, f"Session không tồn tại: {session_id!r}")
@@ -255,15 +275,71 @@ class Manager:
             "sandbox_stop",
             session["workspace_id"],
             sandbox_id,
-            lambda: self._do_stop(session_id, sandbox_id),
+            lambda: self._do_stop(
+                session_id,
+                session["workspace_id"],
+                sandbox_id,
+                session["state"],
+                force=force,
+            ),
         )
 
-    def _do_stop(self, session_id: str, sandbox_id: str | None) -> dict:
+    def _do_stop(
+        self,
+        session_id: str,
+        workspace_id: str,
+        sandbox_id: str | None,
+        state: str,
+        force: bool = False,
+    ) -> dict:
+        # Pull trước khi hủy: RUNNING thì nhận thay đổi về kho, PAUSED bỏ qua (agent đóng băng).
+        pulled: dict = {}
+        if sandbox_id and state == "RUNNING":
+            pulled = self._pull_before_stop(session_id, workspace_id, sandbox_id, force)
+        elif sandbox_id and state == "PAUSED":
+            pulled = {"skipped": "paused"}
         if sandbox_id:
             self.exec_clients.drop(sandbox_id)
             self.provider.terminate_sandbox(sandbox_id)
         self.store.update_session_state(session_id, "STANDBY")
-        return {"state": "STANDBY"}
+        return {"state": "STANDBY", "pulled": pulled}
+
+    def _pull_before_stop(self, session_id: str, workspace_id: str, sandbox_id: str, force: bool) -> dict:
+        """Nhận thay đổi từ sandbox về kho trước khi hủy (check-in cuối).
+
+        Không có trình thực thi → bỏ qua (không có gì để nhận). Thất bại (AppError bất kỳ,
+        gồm xung đột theo policy): ``force`` quyết định hủy luôn (trả tóm tắt ``forced``)
+        hay từ chối stop bằng ``conflict`` — sandbox chưa bị đụng, dữ liệu còn trên volume.
+        """
+        has_agent = getattr(self.provider, "has_exec_agent", None)
+        if callable(has_agent) and not has_agent(sandbox_id):
+            return {"skipped": "no_exec_agent"}
+        client = self.exec_clients.get(sandbox_id, self.provider.get_dial_target(sandbox_id))
+        try:
+            # Chờ ngắn hơn mặc định: stop không được treo lâu vì agent chậm.
+            client.wait_ready(timeout=_STOP_PULL_READY_TIMEOUT)
+            _ws, vfs = self.resolve_session(session_id)
+            try:
+                return workspace_sync.pull(
+                    store=self.store,
+                    vfs=vfs,
+                    client=client,
+                    sandbox_id=sandbox_id,
+                    workspace_id=workspace_id,
+                    policy=vfs.conflict_policy,
+                )
+            finally:
+                vfs.close()
+        except AppError as exc:
+            info = _pull_failure_info(exc)
+            if not force:
+                raise AppError(
+                    ErrorCode.conflict,
+                    "Sandbox có thay đổi chưa nhận về kho — pull thất bại/bị chặn."
+                    " Gọi lại với force=true để bỏ thay đổi.",
+                    details={"pull": info},
+                ) from exc
+            return {"forced": True, **info}
 
     def sandbox_pause(self, session_id: str) -> dict:
         """Tạm dừng sandbox đang RUNNING → phiên PAUSED."""
@@ -416,6 +492,29 @@ class Manager:
 
         return self._op("sync_push", session["workspace_id"], sandbox_id, _do)
 
+    def sync_pull(self, session_id: str) -> dict:
+        """Nhận thay đổi từ sandbox về kho (check-in). Policy xung đột đọc từ workspace."""
+        session, sandbox_id, client = self._running_target(session_id)
+
+        def _do() -> dict:
+            client.wait_ready(timeout=self.settings.agent_ready_timeout)
+            _ws, vfs = self.resolve_session(session_id)
+            try:
+                policy = vfs.conflict_policy
+                summary = workspace_sync.pull(
+                    store=self.store,
+                    vfs=vfs,
+                    client=client,
+                    sandbox_id=sandbox_id,
+                    workspace_id=session["workspace_id"],
+                    policy=policy,
+                )
+            finally:
+                vfs.close()
+            return {**summary, "policy": policy}
+
+        return self._op("sync_pull", session["workspace_id"], sandbox_id, _do)
+
     def command_run(
         self,
         session_id: str,
@@ -519,7 +618,7 @@ class Manager:
             "differ": differ,
             "only_vfs": only_vfs,
             "only_sandbox": only_sandbox,
-            "in_sync": not differ and not only_vfs,
+            "in_sync": not differ and not only_vfs and not only_sandbox,
         }
 
     # ------------------------------------------------------ quản trị sandbox

@@ -54,6 +54,11 @@ class ExecAgentStub:
                 request_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.ListRequest.SerializeToString,
                 response_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.FileEntry.FromString,
                 _registered_method=True)
+        self.PullFiles = channel.unary_stream(
+                '/sandbox_kit.agent.v1.ExecAgent/PullFiles',
+                request_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.PullRequest.SerializeToString,
+                response_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.PullEvent.FromString,
+                _registered_method=True)
 
 
 class ExecAgentServicer:
@@ -88,6 +93,15 @@ class ExecAgentServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PullFiles(self, request, context):
+        """Nhận nội dung file từ sandbox về kho (pull-back, W3): Manager gửi danh sách path,
+        agent stream từng file: FileStart (path/size/sha256) → các đoạn data → FileEnd.
+        Path không đọc được (không tồn tại, lỗi) → sự kiện Missing, không làm hỏng file khác.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ExecAgentServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -110,6 +124,11 @@ def add_ExecAgentServicer_to_server(servicer, server):
                     servicer.ListFiles,
                     request_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.ListRequest.FromString,
                     response_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.FileEntry.SerializeToString,
+            ),
+            'PullFiles': grpc.unary_stream_rpc_method_handler(
+                    servicer.PullFiles,
+                    request_deserializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.PullRequest.FromString,
+                    response_serializer=sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.PullEvent.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -220,6 +239,33 @@ class ExecAgent:
             '/sandbox_kit.agent.v1.ExecAgent/ListFiles',
             sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.ListRequest.SerializeToString,
             sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.FileEntry.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullFiles(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/sandbox_kit.agent.v1.ExecAgent/PullFiles',
+            sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.PullRequest.SerializeToString,
+            sandbox__kit__clone_dot_agent_dot_proto_dot_sandbox__agent__pb2.PullEvent.FromString,
             options,
             channel_credentials,
             insecure,

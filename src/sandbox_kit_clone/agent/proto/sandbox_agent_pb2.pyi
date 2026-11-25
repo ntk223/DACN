@@ -91,6 +91,32 @@ class FileEntry(_message.Message):
     mtime_ns: int
     def __init__(self, path: _Optional[str] = ..., size: _Optional[int] = ..., sha256: _Optional[str] = ..., mtime_ns: _Optional[int] = ...) -> None: ...
 
+class PullRequest(_message.Message):
+    __slots__ = ("paths",)
+    PATHS_FIELD_NUMBER: _ClassVar[int]
+    paths: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, paths: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class PullEvent(_message.Message):
+    __slots__ = ("start", "data", "end", "missing")
+    START_FIELD_NUMBER: _ClassVar[int]
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    END_FIELD_NUMBER: _ClassVar[int]
+    MISSING_FIELD_NUMBER: _ClassVar[int]
+    start: FileStart
+    data: bytes
+    end: FileEnd
+    missing: Missing
+    def __init__(self, start: _Optional[_Union[FileStart, _Mapping]] = ..., data: _Optional[bytes] = ..., end: _Optional[_Union[FileEnd, _Mapping]] = ..., missing: _Optional[_Union[Missing, _Mapping]] = ...) -> None: ...
+
+class Missing(_message.Message):
+    __slots__ = ("path", "error")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    error: str
+    def __init__(self, path: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
+
 class ExecRequest(_message.Message):
     __slots__ = ("command", "cwd", "env", "timeout_seconds", "request_id")
     class EnvEntry(_message.Message):

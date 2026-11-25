@@ -130,6 +130,57 @@ def test_orphan_is_listed_and_cleaned(manager: Manager) -> None:
     assert orphan not in provider.list_sandboxes()
 
 
+def test_prepare_workspace_recreates_stale_volume(manager: Manager, tmp_path: Path) -> None:
+    """Volume cũ còn file lạ (orphan từ lần stop dở) → prepare_workspace xóa hẳn rồi tạo mới.
+
+    Nếu chỉ chép đè, file ma trong volume sẽ sống sót qua lần seed và lấn át nội dung mới.
+    """
+    from sandbox_kit_clone.providers.docker import LABEL, LABEL_SESSION
+
+    provider = manager.provider
+    client = provider.client
+    session = "stale-volume-session"
+    manager._test_sessions.append(session)  # type: ignore[attr-defined]
+
+    # Giả lập volume cũ còn rác: tạo volume + viết file lạ qua container tạm.
+    volume_name = provider._volume_name(session)
+    client.volumes.create(name=volume_name, labels={LABEL: "1", LABEL_SESSION: session})
+    client.containers.run(
+        IMAGE,
+        command=[
+            "sh",
+            "-c",
+            (
+                "echo ma > /workspace/orphan.txt && mkdir -p /workspace/stale-dir"
+                " && echo x > /workspace/stale-dir/old.py"
+            ),
+        ],
+        volumes={volume_name: {"bind": "/workspace", "mode": "rw"}},
+        labels={LABEL: "helper"},
+        remove=True,
+    )
+
+    # Seed từ thư mục host chỉ có đúng 1 file.
+    source = tmp_path / "seed"
+    source.mkdir()
+    (source / "seed.txt").write_text("giong")
+
+    provider.prepare_workspace(session, str(source))
+
+    # Đọc lại toàn bộ file trong volume (qua container tạm): chỉ còn nội dung seed.
+    out = client.containers.run(
+        IMAGE,
+        command=["find", "/workspace", "-type", "f"],
+        volumes={volume_name: {"bind": "/workspace", "mode": "rw"}},
+        labels={LABEL: "helper"},
+        remove=True,
+    )
+    assert sorted(out.decode().splitlines()) == ["/workspace/seed.txt"]
+    # Volume được tạo lại với label đầy đủ (vẫn do provider quản lý, quét dọn thấy được).
+    labels = client.volumes.get(volume_name).attrs.get("Labels") or {}
+    assert labels.get(LABEL) == "1" and labels.get(LABEL_SESSION) == session
+
+
 def test_missing_image_is_clear_error(manager: Manager) -> None:
     with pytest.raises(AppError) as exc:
         manager.provider.create_sandbox("x", "sandbox-kit/khong-co:0", 60)

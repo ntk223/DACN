@@ -1,4 +1,5 @@
-"""Quản lý sandbox (W2): nạp file VFS vào sandbox, REST /admin/api/sandboxes*, chọn provider."""
+"""Quản lý sandbox (W2): nạp file VFS vào sandbox, REST /admin/api/sandboxes*, chọn provider.
+Bổ sung W3: REST pull (nhận thay đổi sandbox về kho) và param ``force`` cho stop."""
 
 from __future__ import annotations
 
@@ -114,3 +115,59 @@ def test_provider_setting_validation(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         Settings(provider="k8s")
     assert get_provider(Settings(data_dir=str(tmp_path))).name == "fake"
+
+
+PULL_SUMMARY = {
+    "pulled": 2,
+    "applied": [{"path": "out.txt", "kind": "file"}, {"path": "tmp.log", "kind": "delete"}],
+    "conflicts": [],
+    "failures": [],
+    "bytes": 128,
+    "duration_ms": 5,
+    "policy": "sandbox_wins",
+}
+
+
+def test_pull_endpoint(app, client: TestClient, session: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST /sessions/{id}/pull → gọi đúng Manager.sync_pull và trả nguyên summary."""
+    sid = session["session_id"]
+    _start(client, sid)
+    manager = app.state.manager
+    seen: dict = {}
+
+    def fake_sync_pull(session_id: str, **_kwargs):
+        seen["session_id"] = session_id
+        return dict(PULL_SUMMARY)
+
+    monkeypatch.setattr(manager, "sync_pull", fake_sync_pull)
+
+    res = client.post(f"/admin/api/sessions/{sid}/pull")
+    assert res.status_code == 200, res.text
+    assert res.json() == PULL_SUMMARY
+    assert seen["session_id"] == sid
+
+    # Endpoint pull phải được khớp trước routeLifecycle bắt-all (/{action}).
+    assert client.post(f"/admin/api/sessions/{sid}/explode").status_code == 404
+
+
+def test_stop_endpoint_force_param(app, client: TestClient, session: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stop nhận query ?force=true và truyền đúng xuống Manager.sandbox_stop."""
+    sid = session["session_id"]
+    _start(client, sid)
+    manager = app.state.manager
+    calls: list[tuple[str, bool]] = []
+
+    def fake_stop(session_id: str, force: bool = False):
+        calls.append((session_id, force))
+        return {"state": "STANDBY"}
+
+    monkeypatch.setattr(manager, "sandbox_stop", fake_stop)
+
+    # Stop thường → force=False.
+    assert client.post(f"/admin/api/sessions/{sid}/stop").json() == {"state": "STANDBY"}
+    assert calls[-1] == (sid, False)
+
+    # ?force=true → truyền force=True xuống manager (bỏ qua gate chống mất dữ liệu).
+    assert client.post(f"/admin/api/sessions/{sid}/stop?force=true").json() == {"state": "STANDBY"}
+    assert calls[-1] == (sid, True)
+    assert [force for _, force in calls if force] == [True]

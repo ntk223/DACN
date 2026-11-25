@@ -16,6 +16,7 @@ from sandbox_kit_clone.errors import AppError
 from sandbox_kit_clone.manager.exec_client import DeleteOp, ExecClient, PutOp
 from sandbox_kit_clone.manager.manager import Manager
 from sandbox_kit_clone.providers.fake import FakeProvider
+from sandbox_kit_clone.sync import workspace_sync
 
 # ---------------------------------------------------------------- RPC agent
 
@@ -98,11 +99,48 @@ def _write(mgr: Manager, sid: str, **files: str | bytes | None) -> None:
         vfs.close()
 
 
-def _started(mgr: Manager) -> str:
-    sid = mgr.create_workspace("sync")["session_id"]
+def _started(mgr: Manager, policy: str = "sandbox_wins") -> str:
+    sid = mgr.create_workspace("sync", policy)["session_id"]
     _write(mgr, sid, **{"a.txt": "v1\n", "old.txt": "x"})
     mgr.sandbox_start(sid)
     return sid
+
+
+# ------------------------------------------------------------ W3 pull-back / guard
+
+
+def _sandbox_id(mgr: Manager, sid: str) -> str:
+    return mgr.store.get_session(sid)["sandbox_id"]
+
+
+def _volume(mgr: Manager, sid: str) -> Path:
+    return Path(mgr.provider.describe_sandbox(_sandbox_id(mgr, sid))["volume"])
+
+
+def _pull(mgr: Manager, sid: str) -> dict:
+    """Gọi workspace_sync.pull trực tiếp với đúng client + policy của workspace."""
+    session = mgr.store.get_session(sid)
+    client = mgr.exec_clients.get(_sandbox_id(mgr, sid), mgr.provider.get_dial_target(_sandbox_id(mgr, sid)))
+    _ws, vfs = mgr.resolve_session(sid)
+    try:
+        return workspace_sync.pull(
+            store=mgr.store,
+            vfs=vfs,
+            client=client,
+            sandbox_id=session["sandbox_id"],
+            workspace_id=session["workspace_id"],
+            policy=vfs.conflict_policy,
+        )
+    finally:
+        vfs.close()
+
+
+def _with_vfs(mgr: Manager, sid: str, fn):
+    _ws, vfs = mgr.resolve_session(sid)
+    try:
+        return fn(vfs)
+    finally:
+        vfs.close()
 
 
 def test_gate_write_after_start_reaches_sandbox(mgr: Manager) -> None:
@@ -184,4 +222,222 @@ def test_full_resync_and_compare_detects_drift(mgr: Manager) -> None:
     assert [p["path"] for p in cmp["only_sandbox"]] == ["made-by-build.txt"]
     assert mgr.sync_push(sid)["skipped"] is True  # delta không thấy gì (kho không đổi)
     assert mgr.sync_push(sid, full=True)["put"] == 2
-    assert (volume / "a.txt").read_text() == "v1\n" and mgr.sandbox_compare(sid)["in_sync"]
+    # in_sync (ngữ nghĩa mới) còn tính cả only_sandbox — made-by-build.txt vẫn chỉ có ở sandbox.
+    cmp2 = mgr.sandbox_compare(sid)
+    assert (volume / "a.txt").read_text() == "v1\n"
+    assert cmp2["same"] == 2 and not cmp2["differ"] and not cmp2["only_vfs"]
+    assert [p["path"] for p in cmp2["only_sandbox"]] == ["made-by-build.txt"]
+
+
+# ------------------------------------------------------------ W3 pull-back (check-in)
+
+
+def test_pull_imports_new_agent_file(mgr: Manager) -> None:
+    """File agent tạo mới trong sandbox → nhận về kho (import), synced=sha, revision tăng."""
+    sid = _started(mgr)
+    data = "print('tạo bởi agent')\n".encode()
+    (_volume(mgr, sid) / "agent_new.py").write_bytes(data)
+    rev_before = _with_vfs(mgr, sid, lambda v: v.revision)
+
+    r = _pull(mgr, sid)
+
+    assert r["pulled"] is True
+    assert {"path": "agent_new.py", "kind": "import"} in r["applied"]
+    assert r["failures"] == [] and r["conflicts"] == []
+    assert r["bytes"] == len(data)
+
+    def check(v) -> int:
+        info = v.get_file_info("agent_new.py")
+        sha = hashlib.sha256(data).hexdigest()
+        assert info["sha256"] == sha and info["synced_sha256"] == sha
+        assert v.read_file("agent_new.py") == data
+        return v.revision
+
+    assert _with_vfs(mgr, sid, check) > rev_before  # ghi vào kho bump revision
+
+
+def test_pull_takes_sandbox_only_edit(mgr: Manager) -> None:
+    """Chỉ sandbox sửa → nội dung VFS = bản sandbox, synced cập nhật."""
+    sid = _started(mgr)
+    data = "bản sandbox sửa\n".encode()
+    (_volume(mgr, sid) / "a.txt").write_bytes(data)
+
+    r = _pull(mgr, sid)
+
+    assert {"path": "a.txt", "kind": "update"} in r["applied"]
+    assert r["conflicts"] == []
+
+    def check(v) -> None:
+        sha = hashlib.sha256(data).hexdigest()
+        info = v.get_file_info("a.txt")
+        assert info["sha256"] == sha and info["synced_sha256"] == sha
+        assert v.read_file("a.txt") == data
+
+    _with_vfs(mgr, sid, check)
+
+
+def test_pull_error_policy_blocks_everything_on_modify_vs_modify(mgr: Manager) -> None:
+    """Cả hai sửa + policy 'error' → AppError(conflict), VFS không đổi gì (kể cả phần không conflict)."""
+    sid = _started(mgr, policy="error")
+    volume = _volume(mgr, sid)
+    _write(mgr, sid, **{"a.txt": "kho sửa\n"})  # VFS đi trước (synced vẫn bản cũ)
+    (volume / "a.txt").write_text("sandbox sửa\n")  # sandbox cũng sửa → xung đột
+    (volume / "by_agent.txt").write_text("agent\n")  # phần KHÔNG conflict
+
+    with pytest.raises(AppError) as exc:
+        _pull(mgr, sid)
+    assert exc.value.code.value == "conflict"
+    assert exc.value.details["conflicts"] == [
+        {
+            "path": "a.txt",
+            "kind": "modify_vs_modify",
+            "sandbox_sha256": hashlib.sha256("sandbox sửa\n".encode()).hexdigest(),
+            "vfs_sha256": hashlib.sha256("kho sửa\n".encode()).hexdigest(),
+        }
+    ]
+
+    def check(v) -> None:
+        assert v.read_file("a.txt") == "kho sửa\n".encode()  # bản VFS giữ nguyên, không bị đè
+        try:
+            v.read_file("by_agent.txt")
+            raise AssertionError("file mới của agent không được nhận về")
+        except AppError as e:
+            assert e.code.value == "file_not_found"
+
+    _with_vfs(mgr, sid, check)
+
+
+def test_pull_sandbox_wins_overwrites_vfs_on_modify_vs_modify(mgr: Manager) -> None:
+    """Cả hai sửa + policy 'sandbox_wins' → VFS nhận đè bản sandbox, xung đột vẫn được báo."""
+    sid = _started(mgr)  # mặc định sandbox_wins
+    data = "bản sandbox thắng\n".encode()
+    _write(mgr, sid, **{"a.txt": "kho sửa\n"})
+    (_volume(mgr, sid) / "a.txt").write_bytes(data)
+
+    r = _pull(mgr, sid)
+
+    assert r["conflicts"][0]["kind"] == "modify_vs_modify"
+    assert {"path": "a.txt", "kind": "update"} in r["applied"]
+    assert _with_vfs(mgr, sid, lambda v: v.read_file("a.txt")) == data
+
+
+@pytest.mark.parametrize(
+    "policy,blocked", [("error", True), ("sandbox_wins", False)], ids=["error", "sandbox_wins"]
+)
+def test_pull_delete_vs_modify(policy: str, blocked: bool, mgr: Manager) -> None:
+    """Sandbox xóa + VFS sửa: 'error' chặn (kho giữ nguyên); 'sandbox_wins' xóa file kho."""
+    sid = _started(mgr, policy=policy)
+    volume = _volume(mgr, sid)
+    _write(mgr, sid, **{"a.txt": "kho sửa\n"})  # VFS sửa sau khi đã push
+    (volume / "a.txt").unlink()  # sandbox xóa
+
+    if blocked:
+        with pytest.raises(AppError) as exc:
+            _pull(mgr, sid)
+        assert exc.value.code.value == "conflict"
+        assert exc.value.details["conflicts"][0]["kind"] == "delete_vs_modify"
+        assert _with_vfs(mgr, sid, lambda v: v.read_file("a.txt")) == "kho sửa\n".encode()
+        return
+
+    r = _pull(mgr, sid)
+    assert r["conflicts"][0]["kind"] == "delete_vs_modify"
+    assert {"path": "a.txt", "kind": "delete"} in r["applied"]
+
+    def check(v) -> dict | None:
+        assert v.get_file_info("a.txt") is None
+        return v.tombstone_info("a.txt")
+
+    assert _with_vfs(mgr, sid, check)["origin"] == "sandbox"
+
+
+def test_pull_tombstone_origin_sandbox_when_sandbox_loses_pushed_file(mgr: Manager) -> None:
+    """Sandbox vắng file đã push (kho không đổi) → xóa kho, tombstone origin='sandbox'."""
+    sid = _started(mgr)
+    (_volume(mgr, sid) / "a.txt").unlink()
+
+    r = _pull(mgr, sid)
+
+    assert {"path": "a.txt", "kind": "delete"} in r["applied"]
+    assert r["conflicts"] == []
+
+    def check(v) -> dict | None:
+        assert v.get_file_info("a.txt") is None
+        return v.tombstone_info("a.txt")
+
+    tomb = _with_vfs(mgr, sid, check)
+    assert tomb["origin"] == "sandbox" and tomb["sha256"] == hashlib.sha256(b"v1\n").hexdigest()
+
+
+def test_pull_does_not_retrigger_push_candidates(mgr: Manager) -> None:
+    """Không ping-pong: file vừa nhận về có synced == sha → push_candidates không chọn lại."""
+    sid = _started(mgr)
+    (_volume(mgr, sid) / "a.txt").write_text("bản sandbox\n")
+    assert _pull(mgr, sid)["pulled"] is True
+
+    state = mgr.store.get_sync_state(_sandbox_id(mgr, sid))
+
+    def check(v) -> bool:
+        puts, dels = v.push_candidates(state["last_synced_revision"])
+        return "a.txt" not in puts and "a.txt" not in dels
+
+    assert _with_vfs(mgr, sid, check)
+
+
+# ------------------------------------------------------------ W3 guard trước push
+
+
+def test_push_guard_error_policy_blocks_all_sends(mgr: Manager) -> None:
+    """Sandbox sửa X + VFS sửa X, policy 'error' → push bị chặn TRƯỚC KHI gửi bất cứ gì."""
+    sid = _started(mgr, policy="error")
+    volume = _volume(mgr, sid)
+    (volume / "a.txt").write_text("sandbox sửa\n")  # sandbox đổi a.txt (chưa về kho)
+    _write(mgr, sid, **{"a.txt": "kho sửa\n", "c.txt": "mới\n"})  # kho cũng đổi a.txt + thêm c.txt
+
+    with pytest.raises(AppError) as exc:
+        mgr.sync_push(sid)
+    assert exc.value.code.value == "conflict"
+    assert exc.value.details["guarded"] == [{"path": "a.txt", "kind": "put"}]
+    assert (volume / "a.txt").read_text() == "sandbox sửa\n"
+    assert not (volume / "c.txt").exists()  # không gửi gì cả
+
+
+def test_push_guard_sandbox_wins_skips_guarded_but_sends_rest(mgr: Manager) -> None:
+    """Policy 'sandbox_wins': bỏ path bị guard (không gửi), vẫn gửi phần còn lại; bản sandbox về kho qua pull."""
+    sid = _started(mgr)  # sandbox_wins
+    volume = _volume(mgr, sid)
+    (volume / "a.txt").write_text("sandbox sửa\n")
+    _write(mgr, sid, **{"a.txt": "kho sửa\n", "c.txt": "mới\n"})
+
+    r = mgr.sync_push(sid)
+    assert r["guarded"] == [{"path": "a.txt", "kind": "put"}]
+    assert r["put"] == 1  # chỉ c.txt được gửi
+    assert (volume / "c.txt").exists()
+    assert (volume / "a.txt").read_text() == "sandbox sửa\n"  # bản sandbox không bị đè
+
+    r2 = _pull(mgr, sid)  # bản sandbox thắng sẽ về kho
+    assert r2["conflicts"][0]["kind"] == "modify_vs_modify"
+    assert {"path": "a.txt", "kind": "update"} in r2["applied"]
+    assert _with_vfs(mgr, sid, lambda v: v.read_file("a.txt")) == "sandbox sửa\n".encode()
+
+
+def test_push_guard_full_bypasses_guard(mgr: Manager) -> None:
+    """full=True là sửa chữa — VFS thắng, bỏ qua guard, gửi hết kể cả path sandbox đã sửa."""
+    sid = _started(mgr, policy="error")
+    volume = _volume(mgr, sid)
+    (volume / "a.txt").write_text("sandbox sửa\n")
+    _write(mgr, sid, **{"a.txt": "kho sửa\n"})
+
+    r = mgr.sync_push(sid, full=True)
+    assert r["put"] == 2  # a.txt + old.txt
+    assert (volume / "a.txt").read_text() == "kho sửa\n"
+
+
+def test_push_guard_ignores_new_vfs_files(mgr: Manager) -> None:
+    """File mới của kho (chưa từng có trong sandbox) không bị guard chặn — push bình thường."""
+    sid = _started(mgr, policy="error")
+    volume = _volume(mgr, sid)
+    _write(mgr, sid, **{"fresh.txt": "file mới của kho\n"})
+
+    r = mgr.sync_push(sid)
+    assert r["guarded"] == [] and r["put"] == 1
+    assert (volume / "fresh.txt").read_text() == "file mới của kho\n"

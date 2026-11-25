@@ -40,6 +40,24 @@ class DeleteOp:
 
 
 @dataclass
+class PulledFile:
+    """Một file nhận từ sandbox (pull-back). ``error`` khác rỗng = không đọc được.
+
+    ``chunks()`` trả nội dung theo đoạn — gọi được đúng MỘT lần (đã buffer theo file);
+    không dùng khi ``error`` khác rỗng. Hạn chế đã biết (PoC): nội dung buffer trong RAM.
+    """
+
+    path: str
+    size: int
+    sha256: str
+    error: str = ""
+    _chunks: list[bytes] = field(default_factory=list, repr=False)
+
+    def chunks(self) -> Iterator[bytes]:
+        yield from self._chunks
+
+
+@dataclass
 class ExecResult:
     exit_code: int
     timed_out: bool
@@ -187,6 +205,31 @@ class ExecClient:
         except grpc.RpcError as exc:
             raise AppError(
                 ErrorCode.agent_unavailable, f"Không lấy được danh sách file: {exc.code().name} {exc.details()}"
+            ) from exc
+
+    def pull(self, paths: list[str], timeout: float = 600.0) -> Iterator[PulledFile]:
+        """Yêu cầu agent stream nội dung các path (RPC PullFiles, server-streaming).
+
+        Trả iterator PulledFile theo đúng thứ tự path yêu cầu. Lỗi kênh → ``agent_unavailable``.
+        """
+        cur: PulledFile | None = None
+        try:
+            for event in self._stub.PullFiles(pb.PullRequest(paths=paths), timeout=timeout):
+                kind = event.WhichOneof("event")
+                if kind == "start":
+                    cur = PulledFile(path=event.start.path, size=event.start.size, sha256=event.start.sha256)
+                elif kind == "data":
+                    if cur is not None:
+                        cur._chunks.append(event.data)
+                elif kind == "end":
+                    if cur is not None:
+                        yield cur
+                        cur = None
+                elif kind == "missing":
+                    yield PulledFile(path=event.missing.path, size=0, sha256="", error=event.missing.error)
+        except grpc.RpcError as exc:
+            raise AppError(
+                ErrorCode.agent_unavailable, f"Không nhận được file từ sandbox: {exc.code().name} {exc.details()}"
             ) from exc
 
 

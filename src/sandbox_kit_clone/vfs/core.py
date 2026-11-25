@@ -81,6 +81,15 @@ class VFS:
         with self._lock:
             return self._read_revision()
 
+    @property
+    def conflict_policy(self) -> str:
+        """Chính sách xung đột của workspace ('sandbox_wins' | 'error') — tầng đồng bộ W3 đọc để dùng."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT conflict_policy FROM workspace_meta WHERE id = 1"
+            ).fetchone()
+        return str(row[0]) if row is not None else "sandbox_wins"
+
     def close(self) -> None:
         """Đóng connection (teardown test / shutdown)."""
         with self._lock:
@@ -317,6 +326,15 @@ class VFS:
                 "SELECT path, size, sha256, rev, storage_class, blob_ref,"
                 " synced_sha256, mtime, is_binary FROM files WHERE path = ?",
                 (canonical,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def tombstone_info(self, path: str) -> dict | None:
+        """Dấu xóa của ``path`` (path, rev, sha256, origin); không có → ``None`` (guard push dùng)."""
+        canonical = canonicalize_path(path)
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT path, rev, sha256, origin FROM tombstones WHERE path = ?", (canonical,)
             ).fetchone()
         return dict(row) if row is not None else None
 

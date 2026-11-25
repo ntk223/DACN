@@ -1,5 +1,6 @@
 // Giao thức Manager ↔ trình thực thi trong sandbox (mcp-integration §3.9).
 // W2: Exec, SyncFiles (nhận file + xác nhận từng file), ListFiles (danh sách + sha256), Healthcheck.
+// W3: PullFiles (pull-back: nhận nội dung file từ sandbox về kho).
 syntax = "proto3";
 
 package sandbox_kit.agent.v1;
@@ -14,6 +15,10 @@ service ExecAgent {
   rpc SyncFiles(stream SyncMessage) returns (SyncReply);
   // Liệt kê file trong workspace (bỏ qua các thư mục trong exclude_dirs).
   rpc ListFiles(ListRequest) returns (stream FileEntry);
+  // Nhận nội dung file từ sandbox về kho (pull-back, W3): Manager gửi danh sách path,
+  // agent stream từng file: FileStart (path/size/sha256) → các đoạn data → FileEnd.
+  // Path không đọc được (không tồn tại, lỗi) → sự kiện Missing, không làm hỏng file khác.
+  rpc PullFiles(PullRequest) returns (stream PullEvent);
 }
 
 message SyncMessage {
@@ -66,6 +71,24 @@ message FileEntry {
   int64 size = 2;
   string sha256 = 3;
   int64 mtime_ns = 4;
+}
+
+message PullRequest {
+  repeated string paths = 1;        // tương đối với gốc workspace, theo thứ tự cần pull
+}
+
+message PullEvent {
+  oneof event {
+    FileStart start = 1;   // tái dùng FileStart: path, size, sha256 (sha TÍNH TRƯỚC từ file thật)
+    bytes data = 2;        // đoạn nội dung (≤ 1MB / đoạn)
+    FileEnd end = 3;
+    Missing missing = 4;
+  }
+}
+
+message Missing {
+  string path = 1;
+  string error = 2;
 }
 
 message ExecRequest {

@@ -10,6 +10,8 @@ Chạy làm tiến trình chính của container:
   kích thước → ``os.replace`` (nguyên tử: sandbox không bao giờ thấy file ghi dở). Trả xác nhận
   cho TỪNG thao tác; một file lỗi không làm hỏng các file khác.
 - ``ListFiles``: liệt kê file thường trong root (bỏ các thư mục được chỉ định), kèm sha256.
+- ``PullFiles``: stream nội dung file từ sandbox về kho (pull-back): FileStart → data → FileEnd
+  theo từng path; path không đọc được → sự kiện Missing và đi tiếp file sau.
 - ``Healthcheck``: còn sống, gốc workspace, số lệnh đang chạy.
 
 Agent KHÔNG biết VFS, KHÔNG tự quyết xung đột (§5.5). Module này chỉ phụ thuộc grpc +
@@ -39,6 +41,7 @@ AGENT_VERSION = "w2.2"
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_TIMEOUT_SECONDS = 3600
 READ_CHUNK = 64 * 1024
+PULL_CHUNK = 1024 * 1024  # 1MB mỗi đoạn PullFiles (khớp SYNC_CHUNK phía client)
 KILL_GRACE_SECONDS = 2.0
 
 log = logging.getLogger("sandbox_kit_clone.agent")
@@ -224,6 +227,29 @@ class ExecAgentServicer(pb_grpc.ExecAgentServicer):
                 count += 1
                 if request.limit and count >= request.limit:
                     return
+
+    def PullFiles(self, request, context):
+        """Pull-back (W3): stream nội dung từng path về kho; lỗi một file không làm hỏng file khác."""
+        for rel in request.paths:
+            try:
+                target = _resolve_file(self.root, rel)
+                if target.is_symlink() or not target.is_file():
+                    raise _PathError("không phải file thường")
+                st = target.stat()
+                sha = _sha256_file(target)
+            except (OSError, _PathError) as exc:
+                yield pb.PullEvent(missing=pb.Missing(path=rel, error=str(exc)))
+                continue
+            yield pb.PullEvent(start=pb.FileStart(path=rel, size=st.st_size, sha256=sha))
+            try:
+                with open(target, "rb") as f:
+                    for chunk in iter(lambda: f.read(PULL_CHUNK), b""):
+                        yield pb.PullEvent(data=chunk)
+            except OSError as exc:  # file biến mất giữa lúc stat và lúc đọc
+                yield pb.PullEvent(missing=pb.Missing(path=rel, error=str(exc)))
+                continue
+            yield pb.PullEvent(end=pb.FileEnd())
+        log.info("pull %d path", len(request.paths))
 
     def Exec(self, request, context):
         started = time.monotonic()

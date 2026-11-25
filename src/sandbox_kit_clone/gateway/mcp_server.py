@@ -73,9 +73,14 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
     tools["sandbox_start"] = sandbox_start
 
     @mcp.tool()
-    def sandbox_stop(session_id: str) -> dict:
-        """Hủy sandbox của phiên (RUNNING/PAUSED); phiên về STANDBY."""
-        return _safe(lambda: manager.sandbox_stop(session_id))
+    def sandbox_stop(session_id: str, force: bool = False) -> dict:
+        """Hủy sandbox của phiên (RUNNING/PAUSED); phiên về STANDBY.
+
+        Trước khi hủy, các thay đổi agent tạo trong sandbox được nhận về kho tự động;
+        còn thay đổi chưa nhận về mà pull thất bại → trả lỗi conflict — khi đó gọi
+        sync_pull rồi thử lại, hoặc force=true để hủy luôn và MẤT các thay đổi đó.
+        """
+        return _safe(lambda: manager.sandbox_stop(session_id, force=force))
 
     tools["sandbox_stop"] = sandbox_stop
 
@@ -223,6 +228,21 @@ def register_tools(mcp: FastMCP, manager: Manager) -> dict[str, Callable]:
         return _safe(lambda: manager.sync_status(session_id))
 
     tools["sync_status"] = sync_status
+
+    @mcp.tool()
+    def sync_pull(session_id: str) -> dict:
+        """Nhận về kho (VFS) các thay đổi agent tạo trong sandbox (/workspace) — pull-back.
+
+        Quét /workspace của sandbox, so sha256 với kho rồi nhận file mới/sửa/xóa về.
+        Trả về: pulled (số file quét), applied (đã nhận về: path + kind), conflicts (kho và
+        sandbox cùng sửa — policy 'sandbox_wins' nhận bản sandbox đè bản agent kèm cảnh báo,
+        'error' dừng tại file xung đột và giữ bản kho), failures (file đọc/nhận lỗi), kèm
+        bytes, duration_ms. Gọi sau khi chạy lệnh để kho cập nhật với file agent tạo; nếu
+        sandbox_stop trả conflict thì gọi tool này trước khi dừng lại.
+        """
+        return _safe(lambda: manager.sync_pull(session_id))
+
+    tools["sync_pull"] = sync_pull
 
     return tools
 

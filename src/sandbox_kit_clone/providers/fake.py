@@ -134,7 +134,11 @@ class FakeProvider(SandboxProvider):
     # --- Workspace seed + reachability ---
 
     def prepare_workspace(self, session_id: str, host_project_path: str) -> str:
-        """Copy toàn bộ cây mã nguồn vào volume của session (idempotent); trả path làm identifier."""
+        """Copy toàn bộ cây mã nguồn vào volume của session; trả path làm identifier.
+
+        Volume còn sót từ lần chạy trước → xóa sạch rồi seed lại (không để file ma
+        tồn dư "sống dậy" và lấn át nội dung seed).
+        """
         source = Path(host_project_path)
         if not source.is_dir():
             raise AppError(
@@ -142,6 +146,10 @@ class FakeProvider(SandboxProvider):
                 f"Đường dẫn mã nguồn không tồn tại hoặc không phải thư mục: {host_project_path}",
             )
         volume = self._volume_dir(session_id)
+        # File lạ từ lần chạy trước sẽ sống sót qua copytree(dirs_exist_ok=True)
+        # → xóa hẳn thư mục volume rồi tạo mới, volume luôn sạch = đúng nội dung seed.
+        if volume.is_dir():
+            shutil.rmtree(volume)
         volume.mkdir(parents=True, exist_ok=True)
         shutil.copytree(source, volume, dirs_exist_ok=True)
         return str(volume)

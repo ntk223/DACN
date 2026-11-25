@@ -130,12 +130,34 @@ def test_prepare_workspace_copies_tree_idempotent(tmp_path):
     assert (path_in_volume / "pkg" / "mod.py").read_text() == "x = 1"
     assert (path_in_volume / "pkg" / "sub" / "deep.txt").read_text() == "deep"
 
-    # Gọi lại lần nữa (mã nguồn có thêm file) → không lỗi, copy đè đủ.
+    # Gọi lại lần nữa (mã nguồn có thêm file) → không lỗi, volume được dọn sạch rồi seed lại.
     (source / "extra.txt").write_text("extra")
     volume2 = provider.prepare_workspace("s-9", str(source))
     assert volume2 == volume
     assert (path_in_volume / "extra.txt").read_text() == "extra"
-    assert (path_in_volume / "README.md").exists()  # file cũ vẫn còn
+    assert (path_in_volume / "README.md").exists()  # file seed (có trong nguồn) vẫn có mặt
+
+
+def test_prepare_workspace_removes_stale_files(tmp_path):
+    """Volume còn file lạ từ lần chạy trước → lần seed sau phải dọn sạch, đúng nội dung seed."""
+    provider = _make_provider(tmp_path)
+    source = tmp_path / "project"
+    source.mkdir()
+    (source / "README.md").write_text("hello")
+
+    volume = provider.prepare_workspace("s-9", str(source))
+
+    # Giả lập file lạ tồn dư trong volume (orphan từ lần stop dở).
+    volume_path = pathlib.Path(volume)
+    (volume_path / "orphan.txt").write_text("ma")
+    (volume_path / "stale-dir").mkdir()
+    (volume_path / "stale-dir" / "old.py").write_text("x = 0")
+
+    provider.prepare_workspace("s-9", str(source))
+
+    assert not (volume_path / "orphan.txt").exists()
+    assert not (volume_path / "stale-dir").exists()
+    assert (volume_path / "README.md").read_text() == "hello"
 
 
 def test_prepare_workspace_missing_source(tmp_path):

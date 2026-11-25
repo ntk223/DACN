@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n1sandbox_kit_clone/agent/proto/sandbox_agent.proto\x12\x14sandbox_kit.agent.v1\"\xb4\x01\n\x0bSyncMessage\x12\x30\n\x05start\x18\x01 \x01(\x0b\x32\x1f.sandbox_kit.agent.v1.FileStartH\x00\x12\x0e\n\x04\x64\x61ta\x18\x02 \x01(\x0cH\x00\x12,\n\x03\x65nd\x18\x03 \x01(\x0b\x32\x1d.sandbox_kit.agent.v1.FileEndH\x00\x12.\n\x06\x64\x65lete\x18\x04 \x01(\x0b\x32\x1c.sandbox_kit.agent.v1.DeleteH\x00\x42\x05\n\x03msg\"7\n\tFileStart\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x0e\n\x06sha256\x18\x03 \x01(\t\"\t\n\x07\x46ileEnd\"\x16\n\x06\x44\x65lete\x12\x0c\n\x04path\x18\x01 \x01(\t\"\x8b\x01\n\x07\x46ileAck\x12\x0c\n\x04path\x18\x01 \x01(\t\x12,\n\x02op\x18\x02 \x01(\x0e\x32 .sandbox_kit.agent.v1.FileAck.Op\x12\n\n\x02ok\x18\x03 \x01(\x08\x12\x0e\n\x06sha256\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\"\x19\n\x02Op\x12\x07\n\x03PUT\x10\x00\x12\n\n\x06\x44\x45LETE\x10\x01\"d\n\tSyncReply\x12+\n\x04\x61\x63ks\x18\x01 \x03(\x0b\x32\x1d.sandbox_kit.agent.v1.FileAck\x12\x15\n\rbytes_written\x18\x02 \x01(\x03\x12\x13\n\x0b\x64uration_ms\x18\x03 \x01(\x03\"G\n\x0bListRequest\x12\x14\n\x0c\x65xclude_dirs\x18\x01 \x03(\t\x12\x13\n\x0bwith_sha256\x18\x02 \x01(\x08\x12\r\n\x05limit\x18\x03 \x01(\x05\"I\n\tFileEntry\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x0e\n\x06sha256\x18\x03 \x01(\t\x12\x10\n\x08mtime_ns\x18\x04 \x01(\x03\"\xbd\x01\n\x0b\x45xecRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\t\x12\x0b\n\x03\x63wd\x18\x02 \x01(\t\x12\x37\n\x03\x65nv\x18\x03 \x03(\x0b\x32*.sandbox_kit.agent.v1.ExecRequest.EnvEntry\x12\x17\n\x0ftimeout_seconds\x18\x04 \x01(\x05\x12\x12\n\nrequest_id\x18\x05 \x01(\t\x1a*\n\x08\x45nvEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"p\n\tExecEvent\x12.\n\x06output\x18\x01 \x01(\x0b\x32\x1c.sandbox_kit.agent.v1.OutputH\x00\x12*\n\x04\x65xit\x18\x02 \x01(\x0b\x32\x1a.sandbox_kit.agent.v1.ExitH\x00\x42\x07\n\x05\x65vent\"m\n\x06Output\x12\x33\n\x06stream\x18\x01 \x01(\x0e\x32#.sandbox_kit.agent.v1.Output.Stream\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\" \n\x06Stream\x12\n\n\x06STDOUT\x10\x00\x12\n\n\x06STDERR\x10\x01\"P\n\x04\x45xit\x12\x11\n\texit_code\x18\x01 \x01(\x05\x12\x11\n\ttimed_out\x18\x02 \x01(\x08\x12\x13\n\x0b\x64uration_ms\x18\x03 \x01(\x03\x12\r\n\x05\x65rror\x18\x04 \x01(\t\"\x0f\n\rHealthRequest\"Z\n\x0bHealthReply\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x16\n\x0eworkspace_root\x18\x02 \x01(\t\x12\x11\n\tuptime_ms\x18\x03 \x01(\x03\x12\x0f\n\x07running\x18\x04 \x01(\x05\x32\xd6\x02\n\tExecAgent\x12L\n\x04\x45xec\x12!.sandbox_kit.agent.v1.ExecRequest\x1a\x1f.sandbox_kit.agent.v1.ExecEvent0\x01\x12U\n\x0bHealthcheck\x12#.sandbox_kit.agent.v1.HealthRequest\x1a!.sandbox_kit.agent.v1.HealthReply\x12Q\n\tSyncFiles\x12!.sandbox_kit.agent.v1.SyncMessage\x1a\x1f.sandbox_kit.agent.v1.SyncReply(\x01\x12Q\n\tListFiles\x12!.sandbox_kit.agent.v1.ListRequest\x1a\x1f.sandbox_kit.agent.v1.FileEntry0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n1sandbox_kit_clone/agent/proto/sandbox_agent.proto\x12\x14sandbox_kit.agent.v1\"\xb4\x01\n\x0bSyncMessage\x12\x30\n\x05start\x18\x01 \x01(\x0b\x32\x1f.sandbox_kit.agent.v1.FileStartH\x00\x12\x0e\n\x04\x64\x61ta\x18\x02 \x01(\x0cH\x00\x12,\n\x03\x65nd\x18\x03 \x01(\x0b\x32\x1d.sandbox_kit.agent.v1.FileEndH\x00\x12.\n\x06\x64\x65lete\x18\x04 \x01(\x0b\x32\x1c.sandbox_kit.agent.v1.DeleteH\x00\x42\x05\n\x03msg\"7\n\tFileStart\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x0e\n\x06sha256\x18\x03 \x01(\t\"\t\n\x07\x46ileEnd\"\x16\n\x06\x44\x65lete\x12\x0c\n\x04path\x18\x01 \x01(\t\"\x8b\x01\n\x07\x46ileAck\x12\x0c\n\x04path\x18\x01 \x01(\t\x12,\n\x02op\x18\x02 \x01(\x0e\x32 .sandbox_kit.agent.v1.FileAck.Op\x12\n\n\x02ok\x18\x03 \x01(\x08\x12\x0e\n\x06sha256\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\"\x19\n\x02Op\x12\x07\n\x03PUT\x10\x00\x12\n\n\x06\x44\x45LETE\x10\x01\"d\n\tSyncReply\x12+\n\x04\x61\x63ks\x18\x01 \x03(\x0b\x32\x1d.sandbox_kit.agent.v1.FileAck\x12\x15\n\rbytes_written\x18\x02 \x01(\x03\x12\x13\n\x0b\x64uration_ms\x18\x03 \x01(\x03\"G\n\x0bListRequest\x12\x14\n\x0c\x65xclude_dirs\x18\x01 \x03(\t\x12\x13\n\x0bwith_sha256\x18\x02 \x01(\x08\x12\r\n\x05limit\x18\x03 \x01(\x05\"I\n\tFileEntry\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x0e\n\x06sha256\x18\x03 \x01(\t\x12\x10\n\x08mtime_ns\x18\x04 \x01(\x03\"\x1c\n\x0bPullRequest\x12\r\n\x05paths\x18\x01 \x03(\t\"\xb6\x01\n\tPullEvent\x12\x30\n\x05start\x18\x01 \x01(\x0b\x32\x1f.sandbox_kit.agent.v1.FileStartH\x00\x12\x0e\n\x04\x64\x61ta\x18\x02 \x01(\x0cH\x00\x12,\n\x03\x65nd\x18\x03 \x01(\x0b\x32\x1d.sandbox_kit.agent.v1.FileEndH\x00\x12\x30\n\x07missing\x18\x04 \x01(\x0b\x32\x1d.sandbox_kit.agent.v1.MissingH\x00\x42\x07\n\x05\x65vent\"&\n\x07Missing\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\r\n\x05\x65rror\x18\x02 \x01(\t\"\xbd\x01\n\x0b\x45xecRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\t\x12\x0b\n\x03\x63wd\x18\x02 \x01(\t\x12\x37\n\x03\x65nv\x18\x03 \x03(\x0b\x32*.sandbox_kit.agent.v1.ExecRequest.EnvEntry\x12\x17\n\x0ftimeout_seconds\x18\x04 \x01(\x05\x12\x12\n\nrequest_id\x18\x05 \x01(\t\x1a*\n\x08\x45nvEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"p\n\tExecEvent\x12.\n\x06output\x18\x01 \x01(\x0b\x32\x1c.sandbox_kit.agent.v1.OutputH\x00\x12*\n\x04\x65xit\x18\x02 \x01(\x0b\x32\x1a.sandbox_kit.agent.v1.ExitH\x00\x42\x07\n\x05\x65vent\"m\n\x06Output\x12\x33\n\x06stream\x18\x01 \x01(\x0e\x32#.sandbox_kit.agent.v1.Output.Stream\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\" \n\x06Stream\x12\n\n\x06STDOUT\x10\x00\x12\n\n\x06STDERR\x10\x01\"P\n\x04\x45xit\x12\x11\n\texit_code\x18\x01 \x01(\x05\x12\x11\n\ttimed_out\x18\x02 \x01(\x08\x12\x13\n\x0b\x64uration_ms\x18\x03 \x01(\x03\x12\r\n\x05\x65rror\x18\x04 \x01(\t\"\x0f\n\rHealthRequest\"Z\n\x0bHealthReply\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x16\n\x0eworkspace_root\x18\x02 \x01(\t\x12\x11\n\tuptime_ms\x18\x03 \x01(\x03\x12\x0f\n\x07running\x18\x04 \x01(\x05\x32\xa9\x03\n\tExecAgent\x12L\n\x04\x45xec\x12!.sandbox_kit.agent.v1.ExecRequest\x1a\x1f.sandbox_kit.agent.v1.ExecEvent0\x01\x12U\n\x0bHealthcheck\x12#.sandbox_kit.agent.v1.HealthRequest\x1a!.sandbox_kit.agent.v1.HealthReply\x12Q\n\tSyncFiles\x12!.sandbox_kit.agent.v1.SyncMessage\x1a\x1f.sandbox_kit.agent.v1.SyncReply(\x01\x12Q\n\tListFiles\x12!.sandbox_kit.agent.v1.ListRequest\x1a\x1f.sandbox_kit.agent.v1.FileEntry0\x01\x12Q\n\tPullFiles\x12!.sandbox_kit.agent.v1.PullRequest\x1a\x1f.sandbox_kit.agent.v1.PullEvent0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -51,22 +51,28 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_LISTREQUEST']._serialized_end=665
   _globals['_FILEENTRY']._serialized_start=667
   _globals['_FILEENTRY']._serialized_end=740
-  _globals['_EXECREQUEST']._serialized_start=743
-  _globals['_EXECREQUEST']._serialized_end=932
-  _globals['_EXECREQUEST_ENVENTRY']._serialized_start=890
-  _globals['_EXECREQUEST_ENVENTRY']._serialized_end=932
-  _globals['_EXECEVENT']._serialized_start=934
-  _globals['_EXECEVENT']._serialized_end=1046
-  _globals['_OUTPUT']._serialized_start=1048
-  _globals['_OUTPUT']._serialized_end=1157
-  _globals['_OUTPUT_STREAM']._serialized_start=1125
-  _globals['_OUTPUT_STREAM']._serialized_end=1157
-  _globals['_EXIT']._serialized_start=1159
-  _globals['_EXIT']._serialized_end=1239
-  _globals['_HEALTHREQUEST']._serialized_start=1241
-  _globals['_HEALTHREQUEST']._serialized_end=1256
-  _globals['_HEALTHREPLY']._serialized_start=1258
-  _globals['_HEALTHREPLY']._serialized_end=1348
-  _globals['_EXECAGENT']._serialized_start=1351
-  _globals['_EXECAGENT']._serialized_end=1693
+  _globals['_PULLREQUEST']._serialized_start=742
+  _globals['_PULLREQUEST']._serialized_end=770
+  _globals['_PULLEVENT']._serialized_start=773
+  _globals['_PULLEVENT']._serialized_end=955
+  _globals['_MISSING']._serialized_start=957
+  _globals['_MISSING']._serialized_end=995
+  _globals['_EXECREQUEST']._serialized_start=998
+  _globals['_EXECREQUEST']._serialized_end=1187
+  _globals['_EXECREQUEST_ENVENTRY']._serialized_start=1145
+  _globals['_EXECREQUEST_ENVENTRY']._serialized_end=1187
+  _globals['_EXECEVENT']._serialized_start=1189
+  _globals['_EXECEVENT']._serialized_end=1301
+  _globals['_OUTPUT']._serialized_start=1303
+  _globals['_OUTPUT']._serialized_end=1412
+  _globals['_OUTPUT_STREAM']._serialized_start=1380
+  _globals['_OUTPUT_STREAM']._serialized_end=1412
+  _globals['_EXIT']._serialized_start=1414
+  _globals['_EXIT']._serialized_end=1494
+  _globals['_HEALTHREQUEST']._serialized_start=1496
+  _globals['_HEALTHREQUEST']._serialized_end=1511
+  _globals['_HEALTHREPLY']._serialized_start=1513
+  _globals['_HEALTHREPLY']._serialized_end=1603
+  _globals['_EXECAGENT']._serialized_start=1606
+  _globals['_EXECAGENT']._serialized_end=2031
 # @@protoc_insertion_point(module_scope)

@@ -174,7 +174,8 @@ class DockerProvider(SandboxProvider):
     def prepare_workspace(self, session_id: str, host_project_path: str) -> str:
         """Tạo volume ``skc-vol-{session}`` rồi chép cây thư mục host vào (qua container tạm).
 
-        Chép đè, không xóa file cũ trong volume (idempotent như FakeProvider).
+        Volume đã tồn tại (lần chạy trước stop dở / seed dở) → xóa hẳn rồi tạo mới:
+        nếu chỉ chép đè, file lạ tồn dư trong volume "sống dậy" và lấn át nội dung seed.
         """
         source = Path(host_project_path)
         if not source.is_dir():
@@ -183,10 +184,14 @@ class DockerProvider(SandboxProvider):
                 f"Đường dẫn mã nguồn không tồn tại hoặc không phải thư mục: {host_project_path}",
             )
         volume_name = self._volume_name(session_id)
-        if not self._volume_exists(volume_name):
-            self.client.volumes.create(
-                name=volume_name, labels={LABEL: "1", LABEL_SESSION: session_id}
-            )
+        if self._volume_exists(volume_name):
+            # File ma từ lần chạy trước sẽ "sống dậy" và lấn át seed nếu chỉ chép đè
+            # → xóa hẳn volume rồi tạo mới, đảm bảo volume luôn sạch = đúng nội dung seed.
+            # ``_remove_volume`` đã chịu lỗi volume tạm thời còn "in use" (retry + force).
+            self._remove_volume(volume_name)
+        self.client.volumes.create(
+            name=volume_name, labels={LABEL: "1", LABEL_SESSION: session_id}
+        )
         self._ensure_image(self.image)
         helper = self.client.containers.create(
             self.image,

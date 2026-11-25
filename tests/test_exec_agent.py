@@ -6,7 +6,9 @@ Không cần Docker: agent chạy trên máy với gốc là thư mục tạm (F
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import os
 import socket
 import time
 from pathlib import Path
@@ -86,6 +88,35 @@ def test_unreachable_agent_is_clear_error() -> None:
     with pytest.raises(AppError) as exc:
         ExecClient(f"127.0.0.1:{port}").wait_ready(timeout=1)
     assert exc.value.code.value == "agent_unavailable"
+
+
+def test_pull_files_streams_content_and_sha(agent: ExecClient, tmp_path: Path) -> None:
+    """Pull-back (W3): nội dung + sha256 + size khớp file gốc, đúng thứ tự, file >1MB nhiều đoạn."""
+    root = tmp_path / "ws"
+    big = os.urandom(2_500_000)  # > 1MB → agent cắt nhiều đoạn data
+    (root / "sub" / "b.txt").write_text("nội dung file con\n")
+    (root / "big.bin").write_bytes(big)
+    pulled = list(agent.pull(["a.txt", "sub/b.txt", "big.bin"]))
+    assert [p.path for p in pulled] == ["a.txt", "sub/b.txt", "big.bin"]
+    assert all(p.error == "" for p in pulled)
+    chunks_per_file = [list(p.chunks()) for p in pulled]  # chunks() gọi đúng một lần mỗi file
+    for p, chunks, original in zip(pulled, chunks_per_file, [b"hello\n", "nội dung file con\n".encode(), big]):
+        assert p.size == len(original)
+        assert p.sha256 == hashlib.sha256(original).hexdigest()
+        assert b"".join(chunks) == original
+    # file lớn phải được cắt thành nhiều đoạn (mỗi đoạn ≤ 1MB)
+    assert len(chunks_per_file[2]) >= 3 and all(len(c) <= 1024 * 1024 for c in chunks_per_file[2])
+
+
+def test_pull_files_missing_path(agent: ExecClient, tmp_path: Path) -> None:
+    """Path không tồn tại / chứa ``..`` → Missing; các file khác vẫn nhận đủ, đúng thứ tự."""
+    (tmp_path / "ws" / "sub" / "b.txt").write_text("file còn lại\n")
+    pulled = list(agent.pull(["a.txt", "../ngoai.txt", "khong-co.txt", "sub/b.txt"]))
+    assert [p.path for p in pulled] == ["a.txt", "../ngoai.txt", "khong-co.txt", "sub/b.txt"]
+    assert pulled[0].error == "" and b"".join(pulled[0].chunks()) == b"hello\n"
+    assert pulled[3].error == "" and b"".join(pulled[3].chunks()) == "file còn lại\n".encode()
+    for bad in (pulled[1], pulled[2]):
+        assert bad.error and bad.size == 0 and bad.sha256 == ""
 
 
 # ------------------------------------------------------- Manager + REST

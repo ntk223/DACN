@@ -141,6 +141,16 @@ def sync_push(request: Request, session_id: str, body: SyncBody | None = None) -
     return _manager(request).sync_push(session_id, full=bool(body and body.full))
 
 
+@admin_sandbox_router.post("/sessions/{session_id}/pull")
+def sync_pull(request: Request, session_id: str) -> dict:
+    """Nhận về kho (VFS) các thay đổi agent tạo trong sandbox — pull-back (W3).
+
+    Đặt cạnh ``sync`` (đẩy kho → sandbox); hướng ngược lại: quét /workspace,
+    so sha256 với kho rồi nhận file mới/sửa/xóa về (xem ``Manager.sync_pull``).
+    """
+    return _manager(request).sync_pull(session_id)
+
+
 @admin_sandbox_router.get("/sessions/{session_id}/compare")
 def compare(request: Request, session_id: str) -> dict:
     """So kho với /workspace thật của sandbox theo sha256."""
@@ -154,10 +164,16 @@ def check_policy(request: Request, body: PolicyBody) -> dict:
 
 
 @admin_sandbox_router.post("/sessions/{session_id}/{action}")
-def lifecycle(request: Request, session_id: str, action: str, body: RenewBody | None = None) -> dict:
+def lifecycle(
+    request: Request,
+    session_id: str,
+    action: str,
+    body: RenewBody | None = None,
+    force: bool = Query(False, description="stop: bỏ qua gate nhận về kho (MẤT thay đổi trong sandbox)"),
+) -> dict:
     manager = _manager(request)
     if action == "stop":
-        return manager.sandbox_stop(session_id)
+        return manager.sandbox_stop(session_id, force=force)
     if action == "pause":
         return manager.sandbox_pause(session_id)
     if action == "resume":
