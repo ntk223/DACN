@@ -42,7 +42,7 @@ def _start(client: TestClient, session_id: str, **body) -> dict:
 def test_page_served(client: TestClient) -> None:
     # Trang sandbox cũ đã gộp vào /admin (SPA) — route cũ chuyển hướng.
     res = client.get("/admin/sandboxes", follow_redirects=False)
-    assert res.status_code == 302 and res.headers["location"] == "/admin"
+    assert res.status_code == 302 and res.headers["location"] == "/admin/"
 
 
 def test_start_materializes_vfs_files(app, client: TestClient, session: dict) -> None:

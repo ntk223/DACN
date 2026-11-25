@@ -54,12 +54,18 @@ def test_admin_without_dist_returns_hint(tmp_path: Path, monkeypatch: pytest.Mon
     assert "make web" in res.text
 
 
+def test_admin_redirects_to_trailing_slash(client: TestClient) -> None:
+    """/admin → 307 /admin/ để đường dẫn asset tương đối resolve đúng."""
+    res = client.get("/admin", follow_redirects=False)
+    assert res.status_code == 307 and res.headers["location"] == "/admin/"
+
+
 def test_legacy_admin_routes_redirect(client: TestClient) -> None:
     """Route cũ của 3 trang riêng → 302 về /admin, không lộ trong OpenAPI."""
     for path in ("/admin/vfs", "/admin/sandboxes"):
         res = client.get(path, follow_redirects=False)
         assert res.status_code == 302
-        assert res.headers["location"] == "/admin"
+        assert res.headers["location"] == "/admin/"
     openapi = client.get("/openapi.json").json()
     assert not any(p.startswith("/admin") for p in openapi["paths"])
 

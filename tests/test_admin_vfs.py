@@ -41,7 +41,7 @@ def _put(client: TestClient, ws: str, path: str, content: str, **kw) -> dict:
 def test_page_served_and_hidden_from_openapi(client: TestClient) -> None:
     # Trang VFS cũ đã gộp vào /admin (SPA) — route cũ chuyển hướng.
     res = client.get("/admin/vfs", follow_redirects=False)
-    assert res.status_code == 302 and res.headers["location"] == "/admin"
+    assert res.status_code == 302 and res.headers["location"] == "/admin/"
     paths = client.get("/openapi.json").json()["paths"]
     assert not any(p.startswith("/admin") for p in paths)
 

@@ -72,7 +72,13 @@ def create_app(
         return {"status": "ok", "version": __version__}
 
     @app.get("/admin", include_in_schema=False)
-    def admin() -> HTMLResponse:
+    def admin() -> RedirectResponse:
+        """Chuyển hướng sang ``/admin/`` — đường dẫn asset tương đối (``./assets/…``)
+        trong index.html chỉ đúng khi URL kết thúc bằng ``/``."""
+        return RedirectResponse("/admin/", status_code=307)
+
+    @app.get("/admin/", include_in_schema=False)
+    def admin_index() -> HTMLResponse:
         """Giao diện quản trị (SPA React — build trong ``web/dist``)."""
         index = WEB_DIST_DIR / "index.html"
         if index.is_file():
@@ -96,7 +102,7 @@ def create_app(
     # Đặt SAU các router /admin/api/* để không nuốt request API.
     @app.get("/admin/{rest:path}", include_in_schema=False)
     def admin_legacy(rest: str) -> RedirectResponse:
-        return RedirectResponse("/admin", status_code=302)
+        return RedirectResponse("/admin/", status_code=302)
     install_error_handlers(app)
     app.mount("/mcp", mcp.streamable_http_app())
     return app
