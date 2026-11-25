@@ -3,10 +3,33 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { Modal } from "@/components/Modal";
 import { formatBytes, formatTime, truncPath } from "@/lib/format";
 import type { ToastKind } from "./Toast";
+import { DirtyDiffModal } from "./DirtyDiffModal";
 import { FuzzyEditModal } from "./FuzzyEditModal";
+import { HistoryPanel } from "./HistoryPanel";
 import type { FileDetail } from "./types";
+
+/** Icon đồng hồ cho nút "Lịch sử" (mở lịch sử chỉnh sửa của file ngay tại trang Thao tác). */
+function ClockIcon() {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
 
 interface FileEditorProps {
   wsId: string | null;
@@ -96,8 +119,9 @@ function fileMetaRows(file: FileDetail): Array<{ key: string; value: ReactNode }
 }
 
 /**
- * Tab "Nội dung file": meta + trình sửa (Ctrl+S lưu, Tab = 4 spaces),
- * xem nhị phân (ảnh + hex), hành động lưu/sửa khớp mờ/đổi tên/tải về/xóa.
+ * Tab "Nội dung file": thanh công cụ (tên file + meta, nút hành động nhóm phải,
+ * Lưu primary + badge "chưa lưu"), trình sửa (Ctrl+S lưu, Tab = 4 spaces),
+ * xem nhị phân (ảnh + hex), modal sửa khớp mờ.
  */
 export function FileEditor({
   wsId,
@@ -117,8 +141,15 @@ export function FileEditor({
 }: FileEditorProps) {
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const [fuzzyOpen, setFuzzyOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const editable = isNew || (file !== null && file.encoding === "utf-8");
 
+  // Đổi file (hoặc qua lại file mới) → đóng modal diff + lịch sử để không xem lệch file.
+  useEffect(() => {
+    setDiffOpen(false);
+    setHistoryOpen(false);
+  }, [file?.path, isNew]);
 
   // Ctrl+S / Cmd+S lưu — đăng ký toàn cục khi tab này đang mở.
   useEffect(() => {
@@ -137,12 +168,14 @@ export function FileEditor({
     return (
       <EmptyState
         title="Chưa chọn file"
-        description={
-          <>
-            Chọn một file trong cây bên trái, hoặc bấm <b>+ File</b> (phím <span className="kbd">N</span>) để tạo mới.
-          </>
-        }
-      />
+        description="Chọn một file trong cây bên trái để xem và sửa nội dung."
+      >
+        <ul className="vfs-hints">
+          <li>Bấm vào một file trong cây bên trái để mở.</li>
+          <li>Bấm <b>+ File</b> hoặc phím <span className="kbd">N</span> để tạo file mới.</li>
+          <li>Trong trình sửa: <span className="kbd">Ctrl+S</span> lưu, <span className="kbd">Tab</span> chèn 4 dấu cách.</li>
+        </ul>
+      </EmptyState>
     );
   }
 
@@ -176,27 +209,66 @@ export function FileEditor({
   })();
 
   const fuzzyDisabled = !editable || isNew || file === null || file.encoding !== "utf-8";
+  const displayName = isNew ? (newPath.length > 0 ? newPath : "file mới — chưa có đường dẫn") : (file?.path ?? "");
+  const metaText =
+    file !== null && !isNew
+      ? `${formatBytes(file.size)} · rev ${file.rev} · sha ${file.sha256.slice(0, 10)}`
+      : "file chưa được ghi vào kho";
 
   return (
     <div>
-      <div className="vfs-row" style={{ marginBottom: 10 }}>
-        <Button variant="primary" size="sm" loading={busy} disabled={!editable} onClick={onSave} title="Ctrl+S">
-          Lưu{dirty ? " •" : ""}
-        </Button>
-        <Button size="sm" disabled={fuzzyDisabled} onClick={openFuzzy}>
-          Sửa khớp mờ
-        </Button>
-        <Button size="sm" disabled={isNew || file === null} onClick={onMove}>
-          Đổi tên
-        </Button>
-        {file !== null && !isNew ? (
-          <a className="btn btn-sm" href={file.download_url} download={file.path.split("/").pop()}>
-            Tải về
-          </a>
-        ) : null}
-        <Button variant="danger" size="sm" disabled={isNew || file === null} onClick={onDelete}>
-          Xóa
-        </Button>
+      {/* ---- Thanh công cụ file: tên + meta một hàng, nút hành động nhóm phải ---- */}
+      <div className="vfs-filebar">
+        <div className="vfs-filebar-info">
+          <span className="vfs-filebar-name mono" title={isNew ? undefined : file?.path}>
+            {displayName}
+          </span>
+          <span className="vfs-filebar-meta">
+            {metaText}
+            {dirty ? <span className="vfs-filebar-dirty"> · có thay đổi chưa lưu</span> : null}
+          </span>
+        </div>
+        <div className="vfs-filebar-actions">
+          {dirty ? (
+            <>
+              <Badge tone="yellow" title="Nội dung chưa được ghi vào kho">chưa lưu</Badge>
+              <Button
+                size="sm"
+                onClick={() => setDiffOpen(true)}
+                title="So nội dung đang sửa với bản đã lưu trong kho"
+              >
+                Xem thay đổi
+              </Button>
+            </>
+          ) : null}
+          <Button variant="primary" size="sm" loading={busy} disabled={!editable} onClick={onSave} title="Ctrl+S">
+            Lưu
+          </Button>
+          <Button size="sm" disabled={fuzzyDisabled} onClick={openFuzzy}>
+            Sửa khớp mờ
+          </Button>
+          {!isNew ? (
+            <Button
+              size="sm"
+              onClick={() => setHistoryOpen(true)}
+              title="Xem lịch sử chỉnh sửa của file này"
+            >
+              <ClockIcon />
+              Lịch sử
+            </Button>
+          ) : null}
+          <Button size="sm" disabled={isNew || file === null} onClick={onMove}>
+            Đổi tên
+          </Button>
+          {file !== null && !isNew ? (
+            <a className="btn btn-sm" href={file.download_url} download={file.path.split("/").pop()}>
+              Tải về
+            </a>
+          ) : null}
+          <Button variant="danger" size="sm" disabled={isNew || file === null} onClick={onDelete}>
+            Xóa
+          </Button>
+        </div>
       </div>
 
       {isNew ? (
@@ -212,14 +284,17 @@ export function FileEditor({
       ) : null}
 
       {file !== null && !isNew ? (
-        <dl className="vfs-kv" style={{ marginBottom: 10 }}>
-          {fileMetaRows(file).map((row) => (
-            <div key={row.key} className="vfs-kv-pair">
-              <dt>{row.key}</dt>
-              <dd>{row.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <details className="vfs-moredetail">
+          <summary className="vfs-dim vfs-small">Metadata đầy đủ</summary>
+          <dl className="vfs-kv" style={{ marginTop: 8 }}>
+            {fileMetaRows(file).map((row) => (
+              <div key={row.key} className="vfs-kv-pair">
+                <dt>{row.key}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       ) : null}
 
       {editable ? (
@@ -248,7 +323,7 @@ export function FileEditor({
                 <img
                   className="vfs-preview-img"
                   alt={file.path}
-                  src={`data:${mime};base64,${toBase64(bytes)}`}
+                  src={`data:${mime};base64=${toBase64(bytes)}`}
                   style={{ marginBottom: 10 }}
                 />
               ) : null}
@@ -271,6 +346,35 @@ export function FileEditor({
           onApplied={onMutated}
           onToast={onToast}
         />
+      ) : null}
+
+      {/* Xem diff chưa lưu: file mới so với rỗng (toàn bộ là dòng thêm), file có sẵn so với bản đã lưu. */}
+      <DirtyDiffModal
+        open={diffOpen}
+        path={isNew ? (newPath.length > 0 ? newPath : "file mới") : (file?.path ?? "")}
+        before={isNew ? "" : (file?.content ?? "")}
+        after={content}
+        onClose={() => setDiffOpen(false)}
+      />
+
+      {/* Lịch sử chỉnh sửa của file đang mở — xem ngay tại trang Thao tác, không nhảy trang.
+          Sau khôi phục HistoryPanel gọi onRefresh (= onMutated) → trang tải lại file,
+          editor nhận nội dung mới như lúc mở file, modal giữ mở để xem tiếp lịch sử. */}
+      {!isNew && file !== null && wsId !== null ? (
+        <Modal
+          open={historyOpen}
+          title={`Lịch sử chỉnh sửa — ${file.path}`}
+          width={880}
+          onClose={() => setHistoryOpen(false)}
+        >
+          <HistoryPanel
+            wsId={wsId}
+            file={file}
+            isNew={isNew}
+            onToast={onToast}
+            onRefresh={onMutated}
+          />
+        </Modal>
       ) : null}
 
       {!isNew && file !== null ? (

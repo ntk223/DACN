@@ -10,7 +10,7 @@ export function OpsPanel({ operations }: { operations: OperationRow[] }) {
   }
   return (
     <div className="vfs-tblwrap">
-      <table className="table">
+      <table className="table table-zebra">
         <thead>
           <tr>
             <th>giờ</th>

@@ -2,6 +2,8 @@
  * ExecConsole.tsx — chạy lệnh trong sandbox qua stream NDJSON.
  * Enter chạy, ↑/↓ duyệt lịch sử (localStorage), Dừng hủy bằng AbortController.
  * Chỉ phiên RUNNING mới chạy được — trạng thái khác khóa bàn phím.
+ * UX: terminal nền tối chuẩn, tự cuộn theo output (giữ vị trí khi đang đọc),
+ * nút nhảy xuống cuối, chip lệnh mẫu.
  */
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
@@ -10,7 +12,7 @@ import { Field } from "@/components/Field";
 import { execStream } from "./sandboxApi";
 import type { ExecEvent } from "./types";
 
-type LineKind = "cmd" | "out" | "err" | "meta" | "ok" | "warn";
+type LineKind = "cmd" | "out" | "err" | "meta" | "ok" | "warn" | "result-ok" | "result-err";
 
 interface TermLine {
   id: number;
@@ -82,7 +84,8 @@ function handleEvent(
     if (event.timed_out) parts.push("HẾT GIỜ — đã kill");
     if (event.truncated) parts.push("output bị cắt");
     if (event.error_detail) parts.push(event.error_detail);
-    append(event.exit_code === 0 && !event.timed_out ? "meta" : "err", `\n[${parts.join(" · ")}]\n`);
+    // Dòng kết quả: đường kẻ trên + xanh lá (exit 0) / đỏ (exit khác).
+    append(event.exit_code === 0 && !event.timed_out ? "result-ok" : "result-err", `\n[${parts.join(" · ")}]\n`);
     setStatus(`exit ${event.exit_code} · ${event.duration_ms} ms`);
     return;
   }
@@ -100,6 +103,8 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
   const [status, setStatus] = useState("—");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<string[]>(() => loadHistory());
+  // True khi người dùng đã cuộn lên — hiện nút "xuống cuối".
+  const [showJump, setShowJump] = useState(false);
   const historyIdx = useRef(-1);
   const lineId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -111,10 +116,14 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
     return () => abortRef.current?.abort();
   }, []);
 
-  // Cuộn xuống cuối khi có dòng mới (chỉ khi người dùng đang ở cuối).
+  // Cuộn xuống cuối khi có dòng mới — CHỈ khi người dùng đang ở cuối
+  // (đang cuộn lên đọc output cũ thì giữ nguyên vị trí).
   useEffect(() => {
     const node = termRef.current;
-    if (node && atBottom.current) node.scrollTop = node.scrollHeight;
+    if (node && atBottom.current) {
+      node.scrollTop = node.scrollHeight;
+      setShowJump(false);
+    }
   }, [lines]);
 
   const append = (kind: LineKind, text: string) => {
@@ -185,6 +194,22 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
     abortRef.current?.abort();
   };
 
+  /** Nút "xuống cuối": cuộn terminal về dòng mới nhất. */
+  const jumpToBottom = () => {
+    const node = termRef.current;
+    if (!node) return;
+    atBottom.current = true;
+    node.scrollTop = node.scrollHeight;
+    setShowJump(false);
+  };
+
+  const onTermScroll = (event: React.UIEvent<HTMLPreElement>) => {
+    const node = event.currentTarget;
+    const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 30;
+    atBottom.current = nearBottom;
+    setShowJump(!nearBottom);
+  };
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -217,11 +242,12 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
           🔒 Chỉ sandbox đang RUNNING mới chạy được lệnh — bật hoặc tiếp tục phiên trước.
         </div>
       ) : null}
+      {/* Hàng nhập lệnh: input + Chạy (primary) + Dừng (đỏ, khi đang chạy) + Xóa màn hình */}
       <div className="sbx-toolbar">
         <input
           className="input sbx-cmdline"
           type="text"
-          placeholder="lệnh shell, vd: ls -la   (Enter để chạy, ↑/↓ lịch sử)"
+          placeholder="Nhập lệnh, Enter để chạy…"
           autoComplete="off"
           spellCheck={false}
           disabled={!running || !sessionId}
@@ -230,22 +256,23 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
           onKeyDown={onKeyDown}
         />
         <Button
-          size="sm"
           variant="primary"
           disabled={!running || !sessionId || busy}
+          title="Chạy lệnh (Enter)"
           onClick={() => void execute(command.trim())}
         >
-          Chạy
+          ▶ Chạy
         </Button>
         {busy ? (
-          <Button size="sm" variant="danger" onClick={stopCommand}>
-            Dừng
+          <Button variant="danger" title="Hủy lệnh đang chạy (AbortController)" onClick={stopCommand}>
+            ■ Dừng
           </Button>
         ) : null}
-        <Button size="sm" onClick={() => setLines([])} disabled={busy}>
+        <Button size="sm" onClick={() => setLines([])} disabled={busy} title="Xóa toàn bộ output terminal">
           Xóa màn hình
         </Button>
       </div>
+      {/* cwd + timeout — tùy chọn, để hàng riêng cho gọn hàng nhập chính */}
       <div className="sbx-toolbar" style={{ marginTop: 8 }}>
         <Field label="cwd (trong /workspace)">
           <input
@@ -269,44 +296,48 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
             onChange={(event) => setTimeoutSeconds(event.target.value)}
           />
         </Field>
-        <div className="sbx-toolbar">
-          {PRESETS.map((preset) => {
-            const label = preset.length > 22 ? `${preset.slice(0, 20)}…` : preset;
-            return (
-              <Button
-                key={preset}
-                size="sm"
-                title={preset}
-                disabled={!running || busy}
-                onClick={() => {
-                  setCommand(preset);
-                  void execute(preset);
-                }}
-              >
-                {label}
-              </Button>
-            );
-          })}
-        </div>
       </div>
-      <pre
-        ref={termRef}
-        className="sbx-term"
-        style={{ marginTop: 8 }}
-        onScroll={(event) => {
-          const node = event.currentTarget;
-          atBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 30;
-        }}
-      >
-        {lines.length === 0 ? (
-          <span className="ln-meta">Kết quả hiện dần ở đây trong lúc lệnh chạy.</span>
+      {/* Chip lệnh mẫu — bấm chạy ngay, title hiện lệnh đầy đủ */}
+      <div className="sbx-chips" style={{ marginTop: 8 }}>
+        <span className="sbx-meta">Lệnh mẫu:</span>
+        {PRESETS.map((preset) => {
+          const label = preset.length > 26 ? `${preset.slice(0, 24)}…` : preset;
+          return (
+            <Button
+              key={preset}
+              size="sm"
+              variant="ghost"
+              className="sbx-chip"
+              title={preset}
+              disabled={!running || busy}
+              onClick={() => {
+                setCommand(preset);
+                void execute(preset);
+              }}
+            >
+              {label}
+            </Button>
+          );
+        })}
+      </div>
+      {/* Terminal — nền tối chuẩn, tự cuộn, nút xuống cuối khi đang đọc lên trên */}
+      <div className="sbx-term-wrap">
+        <pre ref={termRef} className="sbx-term" onScroll={onTermScroll}>
+          {lines.length === 0 ? (
+            <span className="ln-meta">Kết quả hiện dần ở đây trong lúc lệnh chạy.</span>
+          ) : null}
+          {lines.map((line) => (
+            <span key={line.id} className={`ln-${line.kind}`}>
+              {line.text}
+            </span>
+          ))}
+        </pre>
+        {showJump ? (
+          <button type="button" className="sbx-term-jump" title="Nhảy xuống dòng mới nhất" onClick={jumpToBottom}>
+            ↓ cuối trang
+          </button>
         ) : null}
-        {lines.map((line) => (
-          <span key={line.id} className={`ln-${line.kind}`}>
-            {line.text}
-          </span>
-        ))}
-      </pre>
+      </div>
     </Card>
   );
 }

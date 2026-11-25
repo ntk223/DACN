@@ -28,12 +28,17 @@ export function Tabs<T extends string>({ items, active, onChange }: TabsProps<T>
               appearance: "none",
               background: "none",
               border: "none",
-              padding: "8px 12px",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: "var(--tab-height)",
+              padding: "0 var(--space-4)",
               cursor: "pointer",
-              fontWeight: isActive ? 600 : 400,
+              fontSize: "var(--font-size-base)",
+              fontWeight: isActive ? 600 : 500,
               color: isActive ? "var(--color-accent)" : "var(--color-text-muted)",
               borderBottom: isActive ? "2px solid var(--color-accent)" : "2px solid transparent",
               marginBottom: "-1px",
+              transition: "color 0.12s ease",
             }}
           >
             {item.label}

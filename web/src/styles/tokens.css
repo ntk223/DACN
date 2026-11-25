@@ -3,56 +3,85 @@
  * Theme SÁNG dịu. Không có dark mode.
  * Quy ước đặt tên: --color-<vai trò>[-<trạng thái>], --radius-*, --shadow-*, --space-*.
  * Agent feature: CHỈ dùng biến dưới đây, không hardcode màu trong CSS của feature.
+ * Chi tiết cách dùng: xem UX-GUIDE.md cùng thư mục.
  */
 :root {
   /* ---- Nền & bề mặt ---- */
   --color-bg: #f4f6f8;            /* nền app */
   --color-surface: #ffffff;       /* card, sidebar, header */
   --color-surface-hover: #eef2f6; /* nền hover các mục */
-  --color-border: #e3e8ee;
+  --color-surface-active: #e4e9f0;/* nền control đang nhấn (active) */
+  --color-border: #dfe5ec;
+  --color-border-strong: #cbd5e1; /* viền đậm hơn cho control cần nổi bật */
 
   /* ---- Chữ ---- */
-  --color-text: #1f2937;
-  --color-text-muted: #64748b;
+  --color-text: #111827;          /* gần đen — tiêu chuẩn đọc */
+  --color-text-muted: #4b5563;    /* muted nhưng vẫn đạt contrast tốt */
+  --color-text-faint: #6b7280;    /* chữ phụ rất nhỏ (meta, hash) */
 
   /* ---- Accent (xanh dương) ---- */
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
   --color-accent-soft: #eff6ff;   /* nền nhạt: mục active, badge xanh dương */
+  --color-accent-soft-border: #bfdbfe; /* viền cho nền accent-soft */
 
-  /* ---- Trạng thái ---- */
-  --color-success: #16a34a;
+  --color-success: #15803d;
   --color-success-soft: #f0fdf4;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
   --color-warning-soft: #fffbeb;
   --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
   --color-danger-soft: #fef2f2;
+
+  /* ---- Scrollbar ---- */
+  --color-scrollbar: #c3ccd6;
+
+  /* ---- Bảng ---- */
+  --table-header-bg: #f8fafc;     /* header bảng — nền nhạt, sticky */
+  --table-zebra-bg: #fafbfc;      /* sọc hàng chẵn (table-zebra) */
 
   /* ---- Bo góc ---- */
   --radius-card: 10px;
   --radius-control: 8px;
 
-  /* ---- Đổ bóng rất nhẹ ---- */
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-overlay: 0 8px 24px rgba(16, 24, 40, 0.14); /* modal/popover */
+  /* ---- Đổ bóng — phân lớp rõ: sm (card tĩnh) → md (hover) → overlay (modal) ---- */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 2px 8px rgba(16, 24, 40, 0.10);
+  --shadow-overlay: 0 8px 28px rgba(16, 24, 40, 0.18); /* modal/popover */
+
+  /* ---- Overlay nền tối (modal) ---- */
+  --overlay-bg: rgba(15, 23, 42, 0.45);
 
   /* ---- Font ---- */
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo,
     Consolas, monospace;
-  --font-size-base: 14px;
-  --font-size-sm: 12px;
-  --font-size-lg: 16px;
+  --font-size-base: 15px;         /* body text */
+  --font-size-sm: 13px;           /* label, hint, badge */
+  --font-size-lg: 17px;           /* tiêu đề card, text nổi bật */
+  --font-size-h1: 22px;           /* tiêu đề trang (header) */
+  --font-size-h2: 18px;           /* tiêu đề section */
+  --font-size-mono: 13px;         /* code, hash, log */
+  --line-height-body: 1.55;
+
+  /* ---- Kích thước control (vùng bấm tối thiểu — đừng làm nhỏ hơn) ---- */
+  --control-height: 38px;         /* .btn, .input, .select, .textarea */
+  --control-height-sm: 32px;      /* .btn-sm */
+  --icon-button-size: 36px;       /* nút chỉ có icon (≥36px) */
+  --tab-height: 40px;             /* mục tab */
+  --table-row-min-height: 44px;   /* hàng bảng (qua padding td) */
 
   /* ---- Kích thước layout ---- */
-  --sidebar-width: 220px;
-  --header-height: 48px;
+  --sidebar-width: 240px;
+  --header-height: 64px;          /* header cao đủ chỗ cho title + sub-title */
+  --nav-item-height: 44px;        /* mục điều hướng sidebar */
 
   /* ---- Spacing ---- */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
+  --space-5: 20px;                /* padding card */
+  --space-6: 24px;                /* khoảng cách section */
+  --space-7: 32px;
 }

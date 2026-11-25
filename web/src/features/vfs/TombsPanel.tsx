@@ -8,7 +8,7 @@ export function TombsPanel({ tombstones }: { tombstones: Tombstone[] }) {
   }
   return (
     <div className="vfs-tblwrap">
-      <table className="table">
+      <table className="table table-zebra">
         <thead>
           <tr>
             <th>path</th>

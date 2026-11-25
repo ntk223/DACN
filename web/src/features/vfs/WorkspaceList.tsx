@@ -1,112 +1,118 @@
 import { useState } from "react";
 
 import { Badge } from "@/components/Badge";
-import { Button } from "@/components/Button";
 import { formatBytes } from "@/lib/format";
+import type { OpenVfsOps } from "@/lib/nav";
 import type { Overview, WorkspaceSummaryItem } from "./types";
 
 interface WorkspaceListProps {
   overview: Overview;
+  /** Workspace đang hiển thị ở vùng tabs bên dưới — chỉ dùng để highlight. */
   activeId: string | null;
-  onSelect: (id: string) => void;
-  onCreate: (name: string, conflictPolicy: string) => Promise<void>;
+  /** Bấm cả hàng → mở trang Thao tác tại workspace này (tuỳ chọn). */
+  onOpenOps?: OpenVfsOps;
+}
+
+/** Icon bút chì cho nút "Sửa file này" trong tab Lịch sử. */
+export function PencilIcon() {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+    </svg>
+  );
 }
 
 /** Màu thanh hạn mức: >90% đỏ, >70% cam, còn lại xanh. */
-function quotaTone(used: number, quota: number): string {
+export function quotaTone(used: number, quota: number): string {
   const pct = quota > 0 ? (used / quota) * 100 : 0;
   if (pct > 90) return "var(--color-danger)";
   if (pct > 70) return "var(--color-warning)";
   return "var(--color-success)";
 }
 
+/**
+ * Một dòng workspace — THÔNG TIN THUẦN, không có nút bấm riêng.
+ * Bấm vào bất kỳ đâu trên hàng → mở trang Thao tác tại workspace này.
+ */
 function WorkspaceRow({
   item,
   quota,
   active,
-  onSelect,
+  onOpen,
 }: {
   item: WorkspaceSummaryItem;
   quota: number;
   active: boolean;
-  onSelect: () => void;
+  onOpen?: () => void;
 }) {
   const used = item.used_bytes ?? 0;
   const pct = quota > 0 ? (used / quota) * 100 : 0;
   return (
     <div
       className={`vfs-ws${active ? " active" : ""}`}
-      onClick={onSelect}
+      title="Bấm để xem chi tiết & thao tác"
+      onClick={onOpen}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onSelect();
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") onOpen?.();
       }}
     >
       <div className="vfs-row">
-        <span className="vfs-ws-name">{item.name ?? item.id}</span>
+        <span className="vfs-ws-name vfs-grow">{item.name ?? item.id}</span>
+        {item.conflict_policy !== null && item.conflict_policy !== undefined ? (
+          <Badge tone={item.conflict_policy === "error" ? "yellow" : "default"} title="Chính sách xung đột ghi">
+            {item.conflict_policy}
+          </Badge>
+        ) : null}
         {item.missing_db ? <Badge tone="yellow" title="DB dự án chưa tạo">thiếu DB</Badge> : null}
+        {item.session_id ? (
+          <Badge tone="green" title={`Phiên sandbox đang gắn với workspace: ${item.session_id}`}>
+            phiên đang chạy
+          </Badge>
+        ) : null}
       </div>
       <div className="vfs-ws-meta">
         {item.name ? `${item.id} · ` : ""}
         {item.file_count ?? 0} file · rev {item.revision ?? 0} · {formatBytes(used)}
       </div>
       {item.demonstrates ? <div className="vfs-ws-meta">{item.demonstrates}</div> : null}
-      <div className="vfs-bar" title={`${pct.toFixed(1)}% hạn mức`}>
-        <div style={{ width: `${Math.min(100, pct)}%`, background: quotaTone(used, quota) }} />
+      <div className="vfs-ws-quota" title={`${pct.toFixed(1)}% hạn mức`}>
+        <div className="vfs-bar">
+          <div style={{ width: `${Math.min(100, pct)}%`, background: quotaTone(used, quota) }} />
+        </div>
+        <span className="vfs-ws-pct">{pct.toFixed(0)}%</span>
       </div>
     </div>
   );
 }
 
-/** Cột trái trên: lọc + danh sách workspace kèm thanh hạn mức + form tạo mới. */
-export function WorkspaceList({ overview, activeId, onSelect, onCreate }: WorkspaceListProps) {
+/**
+ * Danh sách workspace ở trang Quản lý — chỉ HIỂN THỊ thông tin
+ * (tên, hạn mức, policy, số file, phiên đang chạy). Bấm cả hàng → trang Thao tác.
+ * Tạo workspace đã chuyển xuống trang Thao tác (nút "+ Workspace").
+ */
+export function WorkspaceList({ overview, activeId, onOpenOps }: WorkspaceListProps) {
   const [filter, setFilter] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [policy, setPolicy] = useState("sandbox_wins");
-  const [busy, setBusy] = useState(false);
 
   const query = filter.trim().toLowerCase();
   const items = overview.workspaces.filter(
     (w) => query.length === 0 || `${w.id} ${w.name ?? ""}`.toLowerCase().includes(query),
   );
 
-  const submit = async () => {
-    setBusy(true);
-    try {
-      await onCreate(name.trim(), policy);
-      setCreating(false);
-      setName("");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <div>
-      {creating ? (
-        <div style={{ marginBottom: 10 }}>
-          <input
-            className="input"
-            value={name}
-            placeholder="tên (tùy chọn)"
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void submit();
-            }}
-          />
-          <div className="vfs-row" style={{ marginTop: 8 }}>
-            <select className="select vfs-grow" value={policy} onChange={(e) => setPolicy(e.target.value)}>
-              <option value="sandbox_wins">sandbox_wins</option>
-              <option value="error">error</option>
-            </select>
-            <Button variant="primary" size="sm" loading={busy} onClick={() => void submit()}>
-              Tạo
-            </Button>
-          </div>
-        </div>
-      ) : null}
       <div className="vfs-row">
         <input
           className="input vfs-grow"
@@ -114,16 +120,13 @@ export function WorkspaceList({ overview, activeId, onSelect, onCreate }: Worksp
           placeholder="lọc theo tên / id…"
           onChange={(e) => setFilter(e.target.value)}
         />
-        <Button size="sm" onClick={() => setCreating((v) => !v)}>
-          + Mới
-        </Button>
       </div>
       <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         {items.length === 0 ? (
           <div className="vfs-dim vfs-small" style={{ textAlign: "center", padding: "10px 0" }}>
             {overview.workspaces.length > 0
               ? "Không khớp."
-              : "Chưa có workspace. Chạy `make seed`."}
+              : "Chưa có workspace. Chạy `make seed` hoặc bấm + Workspace ở trang Thao tác."}
           </div>
         ) : (
           // Mới nhất lên đầu như trang cũ (danh sách seed theo thứ tự tạo).
@@ -133,7 +136,7 @@ export function WorkspaceList({ overview, activeId, onSelect, onCreate }: Worksp
               item={item}
               quota={overview.settings.workspace_quota_bytes}
               active={item.id === activeId}
-              onSelect={() => onSelect(item.id)}
+              onOpen={onOpenOps !== undefined ? () => onOpenOps(item.id) : undefined}
             />
           ))
         )}

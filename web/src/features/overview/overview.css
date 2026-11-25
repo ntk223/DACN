@@ -1,29 +1,96 @@
 /**
- * overview.css — style riêng cho module Overview/Console.
- * CHỈ dùng biến từ tokens.css, không hardcode màu.
+ * overview.css — style riêng cho module Overview/Console/Transfer.
+ * CHỈ dùng biến từ tokens.css, không hardcode màu (nguồn: styles/tokens.css).
+ * Chuẩn: UX-GUIDE.md — section cách nhau 24px, trong card 16px, control ≥ 38px.
  */
 
-/* ---- Bố cục trang ---- */
+/* ---- Bố cục trang: tab bar + nội dung ---- */
 .ov-page {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-/* ---- Lưới card thống kê ---- */
+/* Nội dung 1 tab — các section cách nhau 24px */
+.ov-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* ---- Lưới card thống kê (dashboard) ---- */
 .ov-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.ov-stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+/* Ô icon minh họa mỗi stat card */
+.ov-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  flex-shrink: 0;
 }
 
 .ov-stat-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
+  line-height: 1.2;
   color: var(--color-text);
 }
 
 .ov-stat-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.ov-stat-sub {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+
+/* ---- Trạng thái loading / rỗng trong feature (headline 15px + mô tả 13px) ---- */
+.ov-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-6);
+  text-align: center;
+}
+
+.ov-state-icon {
+  color: var(--color-text-faint);
+  display: inline-flex;
+}
+
+.ov-state-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ov-state-desc {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
@@ -33,12 +100,73 @@
   overflow-x: auto;
 }
 
+/* ---- Alert dùng chung: lỗi (đỏ) / cảnh báo (vàng) / thành công (xanh) ---- */
+.ov-alert,
+.ov-warning,
+.ov-success {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-base);
+  word-break: break-word;
+}
+
+.ov-alert,
+.ov-warning,
+.ov-success {
+  min-width: 0;
+}
+
+.ov-alert {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.ov-warning {
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.ov-success {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.ov-alert svg,
+.ov-warning svg,
+.ov-success svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.ov-alert-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ov-alert-body strong {
+  font-weight: 600;
+}
+
 /* ---- Console MCP: sidebar trái + panel phải ---- */
 .ov-console {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
+}
+
+.ov-console-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
@@ -47,49 +175,87 @@
   }
 }
 
+/* Ô tìm kiếm tool (icon bên trái trong input) */
+.ov-tool-search {
+  position: relative;
+  margin-bottom: var(--space-3);
+}
+
+.ov-tool-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-faint);
+  pointer-events: none;
+}
+
+.ov-tool-search .input {
+  padding-left: 38px;
+}
+
+/* Nhóm tool: tiêu đề nhỏ uppercase + divider */
+.ov-tool-group {
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ov-tool-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
 .ov-tool-group-label {
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
-  margin: var(--space-3) 0 var(--space-1);
-}
-
-.ov-tool-group-label:first-child {
-  margin-top: 0;
+  margin: var(--space-1) 0 var(--space-1);
 }
 
 .ov-tool-btn {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
+  min-height: 36px;
   text-align: left;
   appearance: none;
   border: none;
+  border-radius: var(--radius-control);
   background: none;
   cursor: pointer;
-  padding: 6px var(--space-2);
-  border-radius: var(--radius-control);
+  padding: var(--space-2);
   color: var(--color-text);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
 }
 
 .ov-tool-btn:hover {
   background: var(--color-surface-hover);
 }
 
+/* Tool đang chọn: nền accent-soft + viền trái accent (thấy rõ ở cả nền + viền + chữ) */
 .ov-tool-btn.active {
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
+.ov-tool-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ---- Form chung ---- */
 .ov-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .ov-form-desc {
@@ -103,55 +269,143 @@
   color: var(--color-text-muted);
 }
 
-/* ---- Alert lỗi trong panel (không dùng window.alert) ---- */
-.ov-alert {
+/* Footer form: nút chính nằm phải panel, sticky khi form dài */
+.ov-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-4) calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.ov-form-footer-info {
+  margin-right: auto;
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  word-break: break-word;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- Khung kết quả mono ---- */
 .ov-result {
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ov-result-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.ov-result-head .ov-result-spacer {
+  margin-left: auto;
 }
 
 .ov-pre {
   margin: 0;
-  padding: var(--space-3);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  padding: var(--space-4);
+  background: var(--table-header-bg);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  font-size: var(--font-size-mono);
+  line-height: 1.55;
   overflow: auto;
   max-height: 420px;
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--color-text);
 }
 
 .ov-pre.is-error {
   border-color: var(--color-danger);
   background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* ---- Vùng kéo-thả / chọn file (upload) ---- */
+.ov-dropzone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-4) var(--space-5);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.ov-dropzone:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.ov-dropzone.is-drag {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.ov-dropzone:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ov-dropzone svg {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+.ov-dropzone-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ov-dropzone-hint {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
 /* ---- Tiến trình upload ---- */
 .ov-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 
+.ov-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .ov-progress-bar {
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
   background: var(--color-surface-hover);
   overflow: hidden;

@@ -1,35 +1,21 @@
 /**
- * SandboxDetail.tsx — chi tiết container của sandbox đang chọn: thông tin,
- * số liệu CPU/RAM, và các tab Chạy lệnh / Kiểm tra lệnh / Đồng bộ / File / Log.
+ * SandboxDetail.tsx — thông tin container CHỈ ĐỌC của sandbox đang chọn
+ * (trang Quản lý): image, phiên, volume, giới hạn tài nguyên, CPU/RAM meter.
+ * Các tab thao tác đã chuyển sang trang SandboxOpsPage.
  */
 import { Badge } from "@/components/Badge";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Spinner } from "@/components/Spinner";
-import { Tabs } from "@/components/Tabs";
-import { useState } from "react";
-import { ExecConsole } from "./ExecConsole";
-import { FileBrowser } from "./FileBrowser";
-import { LogsPanel } from "./LogsPanel";
-import { PolicyPanel } from "./PolicyPanel";
-import { SyncPanel } from "./SyncPanel";
-import type { ProviderCapabilities, SandboxDetail as Detail, SessionRow } from "./types";
+import { formatBytes } from "@/lib/format";
+import type { ReactNode } from "react";
+import type { SandboxDetail as Detail } from "./types";
 import { limitsLabel, remainLabel, timeLabel } from "./util";
-
-type Notify = (message: string, kind?: "ok" | "err" | "warn") => void;
-
-type TabKey = "exec" | "policy" | "sync" | "files" | "logs";
 
 interface SandboxDetailProps {
   sandboxId: string | null;
   detail: Detail | null;
   loading: boolean;
-  /** Phiên đang trỏ tới sandbox này (mọi trạng thái live) — null khi mồ côi. */
-  session: SessionRow | null;
-  capabilities: ProviderCapabilities;
-  onExecBusyChange: (busy: boolean) => void;
-  onChanged: () => void;
-  notify: Notify;
 }
 
 function providerTone(state: string | null | undefined): "green" | "yellow" | "red" {
@@ -38,21 +24,20 @@ function providerTone(state: string | null | undefined): "green" | "yellow" | "r
   return "red";
 }
 
-export function SandboxDetail({
-  sandboxId,
-  detail,
-  loading,
-  session,
-  capabilities,
-  onExecBusyChange,
-  onChanged,
-  notify,
-}: SandboxDetailProps) {
-  const [tab, setTab] = useState<TabKey>("exec");
+/** Một mục key/value trong dl — bọc trong div để xếp 2 cột đều nhau. */
+function Kv({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="sbx-kv-item">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
 
+export function SandboxDetail({ sandboxId, detail, loading }: SandboxDetailProps) {
   if (!sandboxId) {
     return (
-      <Card title="Chi tiết sandbox">
+      <Card title="Thông tin container">
         <EmptyState title="Chọn một phiên có sandbox để xem" />
       </Card>
     );
@@ -60,20 +45,20 @@ export function SandboxDetail({
 
   const info = detail?.info;
   const metrics = detail?.metrics;
-  const runningSession = session !== null && session.state === "RUNNING" ? session : null;
 
-  // Tab phù hợp theo khả năng: sandbox mồ côi (không phiên) → ẩn exec/policy/sync.
-  const tabItems: ReadonlyArray<{ key: TabKey; label: string }> = [
-    ...(session ? [{ key: "exec" as TabKey, label: "Chạy lệnh" }] : []),
-    ...(session ? [{ key: "policy" as TabKey, label: "Kiểm tra lệnh" }] : []),
-    ...(session ? [{ key: "sync" as TabKey, label: "Đồng bộ" }] : []),
-    { key: "files", label: "File /workspace" },
-    { key: "logs", label: "Log" },
-  ];
-  const activeTab = tabItems.some((item) => item.key === tab) ? tab : "files";
+  // % RAM dùng được tính trực tiếp; CPU percent so với 1 core = 100%.
+  const ramPercent =
+    metrics?.memory_limit_bytes
+      ? Math.min(100, ((metrics.memory_bytes ?? 0) / metrics.memory_limit_bytes) * 100)
+      : 0;
+  const cpuPercent = Math.min(100, metrics?.cpu_percent ?? 0);
 
   return (
-    <Card title="Chi tiết sandbox" actions={<span className="sbx-meta sbx-mono">{sandboxId}</span>}>
+    <Card
+      // Tiêu đề = sandbox_id mono lớn — định danh chính của sandbox.
+      title={<span className="sbx-title-mono">{sandboxId}</span>}
+      actions={<span className="sbx-meta">Thông tin container — chỉ đọc</span>}
+    >
       {loading && !detail ? (
         <Spinner label="Đang tải thông tin container…" />
       ) : detail === null || info === undefined ? (
@@ -87,91 +72,62 @@ export function SandboxDetail({
           ) : null}
 
           <dl className="sbx-kv">
-            <dt>Trạng thái</dt>
-            <dd>
+            <Kv label="Trạng thái">
               <Badge tone={providerTone(info.state)}>{info.state ?? "?"}</Badge>
-            </dd>
-            <dt>Phiên</dt>
-            <dd className="sbx-mono">{info.session_id ?? "—"}</dd>
-            <dt>Image</dt>
-            <dd className="sbx-mono">{info.image ?? "—"}</dd>
-            <dt>Tạo lúc</dt>
-            <dd>{timeLabel(info.created_at)}</dd>
-            <dt>Hết hạn</dt>
-            <dd>
+            </Kv>
+            <Kv label="Phiên">
+              <span className="sbx-mono">{info.session_id ?? "—"}</span>
+            </Kv>
+            <Kv label="Image">
+              <span className="sbx-mono">{info.image ?? "—"}</span>
+            </Kv>
+            <Kv label="Tạo lúc">{timeLabel(info.created_at)}</Kv>
+            <Kv label="Hết hạn">
               {info.expires_at ? `${timeLabel(info.expires_at)} (${remainLabel(info.expires_at)})` : "không hết hạn"}
-            </dd>
-            <dt>Cổng trình thực thi</dt>
-            <dd className="sbx-mono">{info.dial_target ?? "—"}</dd>
-            <dt>Volume /workspace</dt>
-            <dd className="sbx-mono">{info.volume ?? "—"}</dd>
-            <dt>Giới hạn</dt>
-            <dd>{limitsLabel(info.cpu, info.memory_mb)}</dd>
-            <dt>Mạng</dt>
-            <dd>{info.network ?? "—"}</dd>
+            </Kv>
+            <Kv label="Cổng trình thực thi">
+              <span className="sbx-mono">{info.dial_target ?? "—"}</span>
+            </Kv>
+            <Kv label="Volume /workspace">
+              <span className="sbx-mono">{info.volume ?? "—"}</span>
+            </Kv>
+            <Kv label="Giới hạn">{limitsLabel(info.cpu, info.memory_mb)}</Kv>
+            <Kv label="Mạng">
+              <span className="sbx-mono">{info.network ?? "—"}</span>
+            </Kv>
             {info.oom_killed ? (
-              <>
-                <dt>OOM</dt>
-                <dd>
-                  <Badge tone="red">bị kill vì hết RAM</Badge>
-                </dd>
-              </>
+              <Kv label="OOM">
+                <Badge tone="red">bị kill vì hết RAM</Badge>
+              </Kv>
             ) : null}
           </dl>
 
           {/* Số liệu thật từ Docker stats (nếu provider hỗ trợ) */}
           {metrics?.available ? (
-            <div className="sbx-meta" style={{ marginTop: 10 }}>
-              <div>
-                CPU {metrics.cpu_percent ?? 0}% · RAM {metrics.memory_bytes ?? 0} /{" "}
-                {metrics.memory_limit_bytes ?? 0} bytes
-                {metrics.pids != null ? ` · ${metrics.pids} tiến trình` : ""}
+            <div className="sbx-metrics">
+              <div className="sbx-metric">
+                <span>
+                  CPU <b>{metrics.cpu_percent ?? 0}%</b>
+                </span>
+                <div className="sbx-meter">
+                  <div style={{ width: `${cpuPercent}%` }} />
+                </div>
               </div>
-              <div className="sbx-meter">
-                <div
-                  style={{
-                    width: `${
-                      metrics.memory_limit_bytes
-                        ? Math.min(100, ((metrics.memory_bytes ?? 0) / metrics.memory_limit_bytes) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
+              <div className="sbx-metric">
+                <span>
+                  RAM <b>{formatBytes(metrics.memory_bytes ?? 0)}</b> / {formatBytes(metrics.memory_limit_bytes ?? 0)}
+                </span>
+                <div className="sbx-meter">
+                  <div style={{ width: `${ramPercent}%` }} />
+                </div>
               </div>
+              {metrics.pids != null ? <span>{metrics.pids} tiến trình</span> : null}
             </div>
           ) : metrics?.reason ? (
             <div className="sbx-meta" style={{ marginTop: 10 }}>
               Số liệu: {metrics.reason}
             </div>
           ) : null}
-
-          <div style={{ marginTop: 14 }}>
-            <Tabs items={tabItems} active={activeTab} onChange={setTab} />
-            <div style={{ paddingTop: 12 }}>
-              {activeTab === "exec" ? (
-                <ExecConsole
-                  sessionId={runningSession?.session_id ?? null}
-                  running={runningSession !== null}
-                  onBusyChange={onExecBusyChange}
-                  notify={notify}
-                />
-              ) : null}
-              {activeTab === "policy" ? <PolicyPanel notify={notify} /> : null}
-              {activeTab === "sync" ? (
-                <SyncPanel session={runningSession} onChanged={onChanged} notify={notify} />
-              ) : null}
-              {activeTab === "files" ? (
-                <FileBrowser sandboxId={sandboxId} listing={detail.workspace} notify={notify} />
-              ) : null}
-              {activeTab === "logs" ? (
-                <LogsPanel
-                  sandboxId={sandboxId}
-                  supported={capabilities.diagnostics !== false}
-                  notify={notify}
-                />
-              ) : null}
-            </div>
-          </div>
         </>
       )}
     </Card>

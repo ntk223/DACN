@@ -139,6 +139,38 @@ export interface SyncResult {
   revision?: number;
 }
 
+/** Một file/xóa đã nhận về kho từ sandbox (pull). */
+export interface PullApplied {
+  path: string;
+  /** "file" | "delete" — loại thay đổi đã áp vào kho. */
+  kind?: string;
+}
+
+/** Kho và sandbox cùng sửa một file khi pull. */
+export interface PullConflict {
+  path: string;
+  kind?: string;
+  sandbox_sha256?: string;
+  vfs_sha256?: string;
+}
+
+/** File đọc/nhận lỗi khi pull. */
+export interface PullFailure {
+  path: string;
+  error?: string;
+}
+
+/** POST /sessions/{id}/pull — nhận thay đổi sandbox về kho (pull-back, W3). */
+export interface PullSummary {
+  pulled?: number;
+  applied?: PullApplied[];
+  conflicts?: PullConflict[];
+  failures?: PullFailure[];
+  bytes?: number;
+  duration_ms?: number;
+  policy?: string;
+}
+
 /** GET /sessions/{id}/compare — so sha256 kho ↔ sandbox. */
 export interface CompareResult {
   revision?: number | null;

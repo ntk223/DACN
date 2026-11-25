@@ -1,9 +1,10 @@
 /**
  * ConsoleTab.tsx — Console MCP: port tính năng chính của trang admin cũ.
- * - Khung chọn workspace/session (mọi tool call lấy session_id từ đây).
- * - Sidebar 14 tool chia nhóm (metadata port từ admin.html).
+ * - Khung chọn workspace/session 2 bước (mọi tool call lấy session_id từ đây).
+ * - Sidebar 14 tool chia nhóm + ô tìm kiếm (metadata port từ admin.html).
  * - Form sinh động theo metadata, gọi POST /mcp/ (JSON-RPC tools/call),
- *   parse được JSON thuần lẫn SSE; kết quả hiển thị trong khung pre mono có nút copy.
+ *   parse được JSON thuần lẫn SSE; kết quả hiển thị trong khung pre mono
+ *   có nút Copy và Xóa kết quả.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -19,6 +20,8 @@ import { callMcpTool, isObject, safeJsonStringify } from "./mcp";
 import type { McpCallOutcome } from "./mcp";
 import { MCP_TOOLS, groupMcpTools } from "./mcpTools";
 import type { McpTool, ToolField } from "./mcpTools";
+import { IconErrorCircle, IconSearch, IconTrash, IconWarn } from "./icons";
+import { OvLoading } from "./states";
 import type { SessionRow, WorkspaceDetailResponse } from "./types";
 import { useWorkspaces } from "./useWorkspaces";
 
@@ -42,6 +45,7 @@ export function ConsoleTab() {
   const [sessionId, setSessionId] = useState("");
 
   const [selectedTool, setSelectedTool] = useState<McpTool>(FIRST_TOOL);
+  const [toolQuery, setToolQuery] = useState("");
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [sending, setSending] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
@@ -84,6 +88,21 @@ export function ConsoleTab() {
     return () => controller.abort();
   }, [workspaceId]);
 
+  // Lọc tool theo tên gõ trong ô tìm kiếm (không phân biệt hoa thường).
+  const filteredGroups = useMemo(() => {
+    const query = toolQuery.trim().toLowerCase();
+    if (query === "") return TOOL_GROUPS;
+    return TOOL_GROUPS.map((group) => ({
+      name: group.name,
+      tools: group.tools.filter((tool) => tool.name.toLowerCase().includes(query)),
+    })).filter((group) => group.tools.length > 0);
+  }, [toolQuery]);
+  const filteredCount = filteredGroups.reduce((sum, group) => sum + group.tools.length, 0);
+
+  // Tool nào cần session_id → cảnh báo vàng ngay khi thiếu phiên (không chờ bấm Gửi).
+  const toolNeedsSession = selectedTool.fields.some((field) => field.session);
+  const missingSession = toolNeedsSession && !sessionsLoading && sessionsError === null && sessionId === "";
+
   /** Gửi tool call; workspace_create thành công → cập nhật khung chọn luôn. */
   async function handleSend(tool: McpTool, args: Record<string, unknown>) {
     setSending(true);
@@ -112,9 +131,10 @@ export function ConsoleTab() {
   if (loading) {
     return (
       <Card title="Console MCP">
-        <div className="empty-state">
-          <Spinner large label="Đang tải danh sách workspace…" />
-        </div>
+        <OvLoading
+          title="Đang tải Console MCP…"
+          description="Đang lấy danh sách workspace để khung chọn phiên."
+        />
       </Card>
     );
   }
@@ -123,8 +143,11 @@ export function ConsoleTab() {
     return (
       <Card title="Console MCP">
         <div className="ov-alert" role="alert">
-          <strong>Không tải được danh sách workspace</strong>
-          <span>{error}</span>
+          <IconErrorCircle />
+          <div className="ov-alert-body">
+            <strong>Không tải được danh sách workspace</strong>
+            <span>{error}</span>
+          </div>
         </div>
       </Card>
     );
@@ -132,15 +155,16 @@ export function ConsoleTab() {
 
   return (
     <div className="ov-console">
-      {/* ---- Cột trái: khung chọn phiên + danh sách tool ---- */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      {/* ---- Cột trái: khung chọn phiên 2 bước + danh sách tool ---- */}
+      <div className="ov-console-col">
         <Card title="Phiên làm việc">
           <div className="ov-form">
-            <Field label="Workspace">
+            <Field label="Bước 1 · Workspace" hint="Chọn workspace cần thao tác.">
               <select
                 className="select"
                 value={workspaceId}
                 onChange={(e) => setWorkspaceId(e.target.value)}
+                aria-label="Workspace"
               >
                 {workspaces.length === 0 ? <option value="">(chưa có workspace)</option> : null}
                 {workspaces.map((ws) => (
@@ -151,7 +175,7 @@ export function ConsoleTab() {
               </select>
             </Field>
             <Field
-              label="Session (session_id của mọi tool call)"
+              label="Bước 2 · Session"
               hint={
                 sessionsLoading
                   ? "Đang nạp phiên…"
@@ -159,10 +183,11 @@ export function ConsoleTab() {
               }
             >
               <select
-                className="select"
+                className="select mono"
                 value={sessionId}
                 onChange={(e) => setSessionId(e.target.value)}
-                disabled={sessions.length === 0}
+                disabled={workspaces.length === 0 || sessions.length === 0}
+                aria-label="Session"
               >
                 {sessions.length === 0 ? <option value="">(không có phiên)</option> : null}
                 {sessions.map((s) => (
@@ -174,45 +199,79 @@ export function ConsoleTab() {
             </Field>
             {sessionsError !== null ? (
               <div className="ov-alert" role="alert">
-                {sessionsError}
+                <IconErrorCircle />
+                <div className="ov-alert-body">
+                  <strong>Không nạp được phiên</strong>
+                  <span>{sessionsError}</span>
+                </div>
               </div>
             ) : null}
             {sessionsLoading ? (
               <Spinner label="Đang nạp phiên…" />
+            ) : sessionId === "" ? (
+              <div className="ov-warning" role="status">
+                <IconWarn />
+                <div className="ov-alert-body">
+                  <span>
+                    Workspace này chưa có phiên — các tool cần session sẽ không gửi được. Hãy tạo phiên bằng tool{" "}
+                    <code>workspace_create</code>.
+                  </span>
+                </div>
+              </div>
             ) : (
               <SessionBadge sessionId={sessionId} sessions={sessions} />
             )}
           </div>
         </Card>
 
-        <Card title="Tools MCP">
-          {TOOL_GROUPS.map((group) => (
-            <div key={group.name}>
-              <div className="ov-tool-group-label">{group.name}</div>
-              {group.tools.map((tool) => (
-                <button
-                  key={tool.name}
-                  type="button"
-                  className={tool.name === selectedTool.name ? "ov-tool-btn active" : "ov-tool-btn"}
-                  title={tool.desc}
-                  onClick={() => setSelectedTool(tool)}
-                >
-                  {tool.name}
-                </button>
-              ))}
+        <Card title={`Tools MCP (${filteredCount}/${MCP_TOOLS.length})`}>
+          <div className="ov-tool-search">
+            <IconSearch />
+            <input
+              className="input"
+              type="search"
+              placeholder="Tìm tool theo tên…"
+              aria-label="Tìm tool MCP theo tên"
+              value={toolQuery}
+              onChange={(e) => setToolQuery(e.target.value)}
+            />
+          </div>
+          {filteredGroups.length === 0 ? (
+            <div className="ov-state">
+              <div className="ov-state-title">Không có tool nào khớp</div>
+              <div className="ov-state-desc">Thử từ khóa khác, ví dụ “file” hoặc “sandbox”.</div>
             </div>
-          ))}
+          ) : (
+            filteredGroups.map((group) => (
+              <div key={group.name} className="ov-tool-group">
+                <div className="ov-tool-group-label">{group.name}</div>
+                {group.tools.map((tool) => (
+                  <button
+                    key={tool.name}
+                    type="button"
+                    className={tool.name === selectedTool.name ? "ov-tool-btn active" : "ov-tool-btn"}
+                    title={tool.desc}
+                    aria-pressed={tool.name === selectedTool.name}
+                    onClick={() => setSelectedTool(tool)}
+                  >
+                    {tool.name}
+                  </button>
+                ))}
+              </div>
+            ))
+          )}
         </Card>
       </div>
 
       {/* ---- Cột phải: form + kết quả ---- */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div className="ov-console-col">
         <Card title="Gọi tool MCP">
           <ToolForm
             key={selectedTool.name}
             tool={selectedTool}
             sessionId={sessionId}
             sending={sending}
+            missingSession={missingSession}
             onSubmit={(args) => void handleSend(selectedTool, args)}
           />
         </Card>
@@ -220,13 +279,16 @@ export function ConsoleTab() {
         {panelError !== null ? (
           <Card>
             <div className="ov-alert" role="alert">
-              <strong>Lỗi gọi tool</strong>
-              <span>{panelError}</span>
+              <IconErrorCircle />
+              <div className="ov-alert-body">
+                <strong>Lỗi gọi tool</strong>
+                <span>{panelError}</span>
+              </div>
             </div>
           </Card>
         ) : null}
 
-        {outcome !== null ? <ResultPanel outcome={outcome} /> : null}
+        {outcome !== null ? <ResultPanel outcome={outcome} onClear={() => setOutcome(null)} /> : null}
       </div>
     </div>
   );
@@ -252,11 +314,13 @@ function ToolForm({
   tool,
   sessionId,
   sending,
+  missingSession,
   onSubmit,
 }: {
   tool: McpTool;
   sessionId: string;
   sending: boolean;
+  missingSession: boolean;
   onSubmit: (args: Record<string, unknown>) => void;
 }) {
   // Giá trị form: bool giữ boolean, còn lại giữ chuỗi (number/json parse lúc gửi).
@@ -331,9 +395,8 @@ function ToolForm({
       }}
     >
       <div>
-        <div style={{ fontWeight: 600 }}>MCP tool: {tool.name}</div>
+        <div style={{ fontWeight: 600, fontSize: "var(--font-size-lg)" }}>{tool.name}</div>
         <div className="ov-form-desc">{tool.desc}</div>
-        <div className="ov-form-endpoint">POST /mcp/ · tools/call → {tool.name}</div>
       </div>
 
       {tool.fields.map((field) => (
@@ -345,13 +408,29 @@ function ToolForm({
         />
       ))}
 
-      {formError !== null ? (
-        <div className="ov-alert" role="alert">
-          {formError}
+      {missingSession ? (
+        <div className="ov-warning" role="status">
+          <IconWarn />
+          <div className="ov-alert-body">
+            <span>
+              Chưa chọn session — hãy chọn workspace/phiên trong khung “Phiên làm việc” (hoặc tạo workspace bằng tool{" "}
+              <code>workspace_create</code>).
+            </span>
+          </div>
         </div>
       ) : null}
 
-      <div>
+      {formError !== null ? (
+        <div className="ov-alert" role="alert">
+          <IconErrorCircle />
+          <div className="ov-alert-body">
+            <span>{formError}</span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="ov-form-footer">
+        <span className="ov-form-footer-info">POST /mcp/ · tools/call → {tool.name}</span>
         <Button variant="primary" type="submit" loading={sending}>
           Gửi
         </Button>
@@ -436,8 +515,8 @@ function ToolFieldInput({
   );
 }
 
-/** Khung kết quả: pre mono + copy; lỗi → nền đỏ + badge LỖI. */
-function ResultPanel({ outcome }: { outcome: Outcome }) {
+/** Khung kết quả: pre mono + Copy + Xóa kết quả; lỗi → nền đỏ + icon. */
+function ResultPanel({ outcome, onClear }: { outcome: Outcome; onClear: () => void }) {
   const [copied, setCopied] = useState(false);
   const text = useMemo(() => safeJsonStringify(outcome.data), [outcome.data]);
 
@@ -454,16 +533,26 @@ function ResultPanel({ outcome }: { outcome: Outcome }) {
   return (
     <Card title="Kết quả">
       <div className="ov-result">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Badge tone={outcome.isError ? "red" : "green"}>{outcome.isError ? "LỖI" : "OK"}</Badge>
-          <span className="ov-form-desc mono">{outcome.tool}</span>
+        <div className="ov-result-head">
+          {outcome.isError ? <Badge tone="red">LỖI</Badge> : <Badge tone="green">OK</Badge>}
+          <span className="ov-form-endpoint">{outcome.tool}</span>
           <span className="ov-form-desc">{outcome.ms} ms</span>
-          <span style={{ marginLeft: "auto" }}>
-            <Button size="sm" onClick={() => void handleCopy()}>
-              {copied ? "Đã copy ✓" : "Copy"}
-            </Button>
-          </span>
+          <span className="ov-result-spacer" />
+          <Button size="sm" onClick={() => void handleCopy()}>
+            {copied ? "Đã copy ✓" : "Copy"}
+          </Button>
+          <Button size="sm" variant="ghost" className="btn-icon" title="Xóa kết quả" onClick={onClear}>
+            <IconTrash />
+          </Button>
         </div>
+        {outcome.isError ? (
+          <div className="ov-alert" role="alert">
+            <IconErrorCircle />
+            <div className="ov-alert-body">
+              <span>Tool trả về lỗi — xem chi tiết JSON bên dưới.</span>
+            </div>
+          </div>
+        ) : null}
         <pre className={outcome.isError ? "ov-pre is-error" : "ov-pre"}>{text}</pre>
       </div>
     </Card>

@@ -41,22 +41,25 @@ export function AlgoLab() {
   const [pathInput, setPathInput] = useState("/src/../node_modules\\pkg/index.js");
   const [pathResult, setPathResult] = useState<PathAlgoResult | null>(null);
   const [pathBusy, setPathBusy] = useState(false);
+  const [pathError, setPathError] = useState<string | null>(null);
 
   const [content, setContent] = useState(DEFAULT_CONTENT);
   const [oldText, setOldText] = useState(DEFAULT_OLD);
   const [newText, setNewText] = useState(DEFAULT_NEW);
   const [fuzzyResult, setFuzzyResult] = useState<FuzzyAlgoResult | null>(null);
   const [fuzzyBusy, setFuzzyBusy] = useState(false);
+  const [fuzzyError, setFuzzyError] = useState<string | null>(null);
 
   const runPath = async (path: string) => {
     setPathInput(path);
     setPathBusy(true);
     try {
       setPathResult(await vfsApi.algoPath(path));
+      setPathError(null);
     } catch (error) {
       // Endpoint luôn trả 200 kèm ok=false, hiếm khi vào đây (mất kết nối…).
       setPathResult(null);
-      window.alert(errorMessage(error));
+      setPathError(errorMessage(error));
     } finally {
       setPathBusy(false);
     }
@@ -66,9 +69,10 @@ export function AlgoLab() {
     setFuzzyBusy(true);
     try {
       setFuzzyResult(await vfsApi.algoFuzzy({ content, old_text: oldText, new_text: newText }));
+      setFuzzyError(null);
     } catch (error) {
       setFuzzyResult(null);
-      window.alert(errorMessage(error));
+      setFuzzyError(errorMessage(error));
     } finally {
       setFuzzyBusy(false);
     }
@@ -99,6 +103,11 @@ export function AlgoLab() {
             Chạy
           </Button>
         </div>
+        {pathError !== null ? (
+          <div className="vfs-small" style={{ marginTop: 10, color: "var(--color-danger)" }}>
+            {pathError}
+          </div>
+        ) : null}
         {pathResult !== null ? (
           <dl className="vfs-kv" style={{ marginTop: 10 }}>
             <div className="vfs-kv-pair">
@@ -135,6 +144,11 @@ export function AlgoLab() {
             Chạy
           </Button>
         </div>
+        {fuzzyError !== null ? (
+          <div className="vfs-small" style={{ marginTop: 8, color: "var(--color-danger)" }}>
+            {fuzzyError}
+          </div>
+        ) : null}
         {fuzzyResult !== null ? (
           fuzzyResult.ok ? (
             <>

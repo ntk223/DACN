@@ -113,6 +113,7 @@ export function HistoryPanel({ wsId, file, isNew, onToast, onRefresh }: HistoryP
             <span className="vfs-small vfs-grow vfs-dim">{diff.title}</span>
             <Button
               size="sm"
+              variant="primary"
               disabled={selected.restorable === false || selected.after_sha === file.sha256}
               onClick={() => setConfirmRev(selected)}
             >

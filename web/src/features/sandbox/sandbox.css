@@ -1,20 +1,113 @@
 /**
  * sandbox.css — style riêng cho feature Sandbox.
- * CHỈ dùng biến từ styles/tokens.css, không hardcode màu.
+ * Quy tắc: CHỈ dùng biến từ styles/tokens.css, trừ khối biến cục bộ terminal
+ * ở dưới (đã ghi chú để hợp nhất về tokens.css sau).
  */
 
-/* ---- Layout 2 cột: bảng phiên (trái) + chi tiết (phải) ---- */
-.sbx-layout {
+/* ==== BIẾN CỤC BỘ TERMINAL — CẦN HỢP NHẤT VÀO tokens.css SAU ====
+ * Terminal exec/log cần nền TỐT trong app SÁNG (chuẩn terminal, dễ đọc output),
+ * tokens.css chưa có biến dark nên định nghĩa cục bộ tại đây, scope CHỈ trong
+ * khung terminal (.sbx-term / .sbx-dark) để không ảnh hưởng bề mặt khác.
+ * Khi hợp nhất: đổi tên --term-* thành --terminal-* trong tokens.css và xóa
+ * khối này. Giá trị hiện tại (Tailwind slate/red/green/amber/sky palette):
+ */
+.sbx-term,
+.sbx-dark {
+  --term-bg: #0f172a;     /* nền terminal (slate-900) */
+  --term-fg: #e2e8f0;     /* chữ chính (slate-200) */
+  --term-muted: #94a3b8;  /* chữ phụ/meta (slate-400) */
+  --term-err: #fca5a5;    /* stderr / lỗi (red-300) */
+  --term-ok: #4ade80;     /* exit 0 (green-400) */
+  --term-warn: #fbbf24;   /* cảnh báo (amber-400) */
+  --term-accent: #7dd3fc; /* dòng lệnh đã gõ (sky-300) */
+  --term-border: #334155; /* viền + đường kẻ kết quả (slate-700) */
+}
+
+/* ---- Layout trang Thao tác: danh sách hẹp (trái) + tabs thao tác (phải) ---- */
+.sbx-ops-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
 
 @media (max-width: 1100px) {
-  .sbx-layout {
+  .sbx-ops-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- Item sandbox trong danh sách cột trái (nút chọn, cao đủ bấm) ---- */
+.sbx-ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sbx-ops-item {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.sbx-ops-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.sbx-ops-item-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.sbx-ops-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ---- Banner cảnh báo vàng (phiên STANDBY ở trang Thao tác) ---- */
+.sbx-banner-warn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-warning-soft);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+/* ---- Thanh hành động phiên (trang Thao tác, dưới tiêu đề sandbox_id) ----
+ * Gom badges trạng thái + TTL + các nút vòng đời vào một hàng: PAUSED cũng
+ * hiển thị tại đây (thay cho banner riêng) để layout gọn mà vẫn đầy đủ. */
+.sbx-action-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.sbx-action-bar .spacer {
+  flex: 1;
 }
 
 .sbx-col {
@@ -37,6 +130,30 @@
   flex-wrap: wrap;
 }
 
+/* ---- Badge trạng thái có chấm tròn trước chữ ---- */
+.sbx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Chấm RUNNING nhấp nháy nhẹ báo hiệu phiên đang sống. */
+.sbx-dot-live {
+  animation: sbx-pulse 2s ease-in-out infinite;
+}
+
+@keyframes sbx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* ---- Table ---- */
 .sbx-table th,
 .sbx-table td {
@@ -47,8 +164,25 @@
   cursor: pointer;
 }
 
+/* Bảng Quản lý là bảng thông tin: bấm hàng nào cũng jump trang Thao tác —
+   mọi hàng đều cursor pointer + hover nền rõ (hover nền do .table đảm nhiệm,
+   ở dưới chỉ giữ nền selected khi hover). */
+
+/* Hàng đang chọn: nền accent-soft + viền trái accent, giữ khi hover. */
 .sbx-table tbody tr.sbx-selected {
   background: var(--color-accent-soft);
+}
+
+.sbx-table tbody tr.sbx-selected:hover {
+  background: var(--color-accent-soft);
+}
+
+.sbx-table tbody tr.sbx-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.sbx-table tbody tr.sbx-selected td {
+  border-bottom-color: var(--color-accent-soft-border);
 }
 
 .sbx-mono {
@@ -57,13 +191,61 @@
   word-break: break-all;
 }
 
-/* ---- Thông tin chi tiết dạng key/value ---- */
+/* ---- TTL còn lại: đậm/vàng < 10 phút, đậm/đỏ < 2 phút ---- */
+.sbx-ttl {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sbx-ttl-warn {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+
+.sbx-ttl-critical {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+/* ---- Nút ghost đỏ (hành động phụ như "Dừng & xóa") ---- */
+.sbx-btn-danger-ghost {
+  color: var(--color-danger);
+}
+
+.sbx-btn-danger-ghost:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-hover);
+}
+
+/* ---- Validation inline trong modal ---- */
+.sbx-field-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.input.input-invalid,
+.input.input-invalid:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-soft);
+}
+
+/* ---- Thông tin chi tiết dạng key/value — 2 cột gọn ---- */
 .sbx-kv {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 4px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-5);
   margin: 0;
   font-size: var(--font-size-sm);
+}
+
+.sbx-kv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .sbx-kv dt {
@@ -75,7 +257,36 @@
   word-break: break-all;
 }
 
-/* ---- Thanh meter RAM ---- */
+/* Tiêu đề card chi tiết = sandbox_id mono lớn */
+.sbx-title-mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  font-weight: 650;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+/* ---- Metrics CPU/RAM: số + thanh meter ---- */
+.sbx-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.sbx-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sbx-metric b {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
 .sbx-meter {
   height: 6px;
   background: var(--color-surface-hover);
@@ -87,49 +298,156 @@
 .sbx-meter > div {
   height: 100%;
   background: var(--color-accent);
+  transition: width 0.3s ease;
 }
 
-/* ---- Terminal exec ---- */
+/* ---- Chấm xanh trên tab "Chạy lệnh" khi lệnh đang chạy ---- */
+.sbx-tab-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+  animation: sbx-pulse 1.2s ease-in-out infinite;
+}
+
+/* ---- Terminal exec — nền tối chuẩn, chữ mono 13px ---- */
+.sbx-term-wrap {
+  position: relative;
+  margin-top: var(--space-2);
+}
+
 .sbx-term {
   margin: 0;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--term-bg);
+  color: var(--term-fg);
+  border: 1px solid var(--term-border);
   border-radius: var(--radius-control);
-  padding: var(--space-2) var(--space-3);
-  min-height: 140px;
-  max-height: 380px;
+  padding: var(--space-3);
+  min-height: 160px;
+  max-height: 420px;
   overflow: auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-mono);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* Nút "nhảy xuống cuối" — hiện khi người dùng cuộn lên đọc output cũ. */
+.sbx-term-jump {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--term-border);
+  border-radius: 999px;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.12s ease;
+}
+
+.sbx-term-jump:hover {
+  border-color: var(--term-muted);
+}
+
+.sbx-term-jump:focus-visible {
+  outline: 2px solid var(--term-accent);
+  outline-offset: 2px;
+}
+
+/* Các loại dòng trong terminal (nền tối → màu phải sáng đủ contrast) */
 .sbx-term .ln-cmd {
-  color: var(--color-accent);
+  color: var(--term-accent);
   font-weight: 600;
 }
 
+.sbx-term .ln-out {
+  color: var(--term-fg);
+}
+
 .sbx-term .ln-err {
-  color: var(--color-danger);
-  background: var(--color-danger-soft);
+  color: var(--term-err);
 }
 
 .sbx-term .ln-meta {
-  color: var(--color-text-muted);
+  color: var(--term-muted);
 }
 
 .sbx-term .ln-ok {
-  color: var(--color-success);
+  color: var(--term-ok);
 }
 
 .sbx-term .ln-warn {
-  color: var(--color-warning);
-  background: var(--color-warning-soft);
+  color: var(--term-warn);
 }
 
-/* ---- Danh sách file /workspace ---- */
+/* Dòng kết quả (exit/duration): ngăn cách bằng đường kẻ + màu theo exit. */
+.sbx-term .ln-result-ok,
+.sbx-term .ln-result-err {
+  display: block;
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px dashed var(--term-border);
+}
+
+.sbx-term .ln-result-ok {
+  color: var(--term-ok);
+}
+
+.sbx-term .ln-result-err {
+  color: var(--term-err);
+}
+
+/* ---- Ô nhập lệnh exec: mono 13px, cao chuẩn 38px (.input sẵn) ---- */
+.sbx-cmdline {
+  flex: 1;
+  min-width: 220px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
+}
+
+/* ---- Hàng chip lệnh mẫu ---- */
+.sbx-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sbx-chip {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.sbx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sbx-toolbar .spacer {
+  flex: 1;
+}
+
+/* ---- Chỉ báo auto-refresh đang chạy (toolbar) ---- */
+.sbx-refreshing {
+  color: var(--color-text-muted);
+  animation: sbx-pulse 1.2s ease-in-out infinite;
+}
+
+/* ---- Danh sách file /workspace — item cao ≥ 32px ---- */
 .sbx-files {
   max-height: 260px;
   overflow: auto;
@@ -139,12 +457,15 @@
 
 .sbx-file {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: 3px 10px;
+  min-height: 32px;
+  padding: 4px 12px;
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
+  transition: background 0.1s ease;
 }
 
 .sbx-file:hover {
@@ -172,11 +493,24 @@
   max-height: 320px;
   overflow: auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* Biến thể tối — dùng chung palette terminal ở đầu file. */
+.sbx-pre.sbx-dark {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  border-color: var(--term-border);
+  line-height: 1.5;
+}
+
+.sbx-dark .sbx-pre-hint {
+  color: var(--term-muted);
+}
+
+/* ---- Sandbox mồ côi ---- */
 .sbx-orphan {
   display: flex;
   flex-direction: column;
@@ -185,6 +519,7 @@
   border-radius: var(--radius-control);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
 }
 
 .sbx-orphan:hover {
@@ -193,27 +528,36 @@
 
 .sbx-orphan-active {
   border-color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
-/* ---- Input lệnh exec ---- */
-.sbx-cmdline {
-  flex: 1;
-  min-width: 200px;
-  font-family: var(--font-mono);
-}
-
-.sbx-toolbar {
+/* ---- EmptyState provider lỗi: hướng dẫn từng bước ---- */
+.sbx-steps {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-2);
-  flex-wrap: wrap;
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-5);
+  text-align: left;
+  color: var(--color-text);
 }
 
-.sbx-toolbar .spacer {
-  flex: 1;
+.sbx-steps code {
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 1px 8px;
+  white-space: nowrap;
 }
 
-/* ---- Bảng so sánh đồng bộ ---- */
+/* ---- Bảng so sánh đồng bộ: tiêu đề nhóm + count ---- */
+.sbx-group-row td {
+  background: var(--table-header-bg);
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
 .sbx-compare-path {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);

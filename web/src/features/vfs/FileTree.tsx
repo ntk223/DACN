@@ -19,6 +19,37 @@ interface TreeNode {
   files: VfsFileRow[];
 }
 
+/** Icon 18px dùng chung cho cây (SVG stroke theo màu chữ hiện tại). */
+const ICON_PROPS = {
+  className: "vfs-node-icon",
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": true,
+} as const;
+
+function FolderIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  );
+}
+
 /** Dựng cây thư mục từ danh sách path phẳng (giữ logic buildTree của trang cũ). */
 function buildTree(files: VfsFileRow[]): TreeNode {
   const root: TreeNode = { name: "", path: "", dirs: new Map(), files: [] };
@@ -40,9 +71,10 @@ function buildTree(files: VfsFileRow[]): TreeNode {
   return root;
 }
 
+/** Badge/size xếp gọn bên phải của mỗi dòng file. */
 function FileBadges({ file }: { file: VfsFileRow }) {
   return (
-    <>
+    <span className="vfs-node-badges">
       {file.storage_class === "blob" ? (
         <Badge tone="default" title="File rời (blob sidecar)">
           blob
@@ -60,11 +92,14 @@ function FileBadges({ file }: { file: VfsFileRow }) {
         </span>
       ) : null}
       <span className="vfs-dim vfs-small">{formatBytes(file.size)}</span>
-    </>
+    </span>
   );
 }
 
-/** Cây file: thư mục gập/mở, nhãn blob/bin, click mở file. Trạng thái gập giữ trong component. */
+/**
+ * Cây file: thư mục gập/mở, icon 18px, badge bên phải, nhánh mở có đường kẻ dọc
+ * dẫn hướng, click mở file. Trạng thái gập giữ trong component.
+ */
 export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   // Khi có lọc, dựng cây chỉ từ các file khớp (như renderTree của trang cũ).
@@ -80,7 +115,7 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
     });
   };
 
-  const walk = (node: TreeNode, depth: number): ReactNode => {
+  const walk = (node: TreeNode): ReactNode[] => {
     const rows: ReactNode[] = [];
     const dirs = [...node.dirs.values()].sort((a, b) => a.name.localeCompare(b.name));
     for (const dir of dirs) {
@@ -89,7 +124,6 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
         <div
           key={`dir:${dir.path}`}
           className="vfs-node"
-          style={{ paddingLeft: 6 + depth * 14 }}
           onClick={() => toggle(dir.path)}
           role="button"
           tabIndex={0}
@@ -98,10 +132,18 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
           }}
         >
           <span className="vfs-node-twist">{open ? "▾" : "▸"}</span>
+          <FolderIcon />
           <span className="vfs-node-name">{`${dir.name}/`}</span>
         </div>,
       );
-      if (open) rows.push(walk(dir, depth + 1));
+      if (open) {
+        // Nhánh đang mở: bọc trong .vfs-level để có đường kẻ dọc dẫn hướng + thụt lề.
+        rows.push(
+          <div key={`level:${dir.path}`} className="vfs-level">
+            {walk(dir)}
+          </div>,
+        );
+      }
     }
     const sorted = [...node.files].sort((a, b) => a.path.localeCompare(b.path));
     for (const file of sorted) {
@@ -109,7 +151,6 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
         <div
           key={`file:${file.path}`}
           className={`vfs-node${file.path === activePath ? " active" : ""}`}
-          style={{ paddingLeft: 6 + depth * 14 }}
           title={file.path}
           onClick={() => onOpen(file.path)}
           role="button"
@@ -119,12 +160,13 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
           }}
         >
           <span className="vfs-node-twist" />
+          <FileIcon />
           <span className="vfs-node-name">{file.path.split("/").pop()}</span>
           <FileBadges file={file} />
         </div>,
       );
     }
-    return <div key={`level:${node.path}:${depth}`}>{rows}</div>;
+    return rows;
   };
 
   if (filtered.length === 0) {
@@ -134,5 +176,5 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
       </div>
     );
   }
-  return <div className="vfs-tree">{walk(tree, 0)}</div>;
+  return <div className="vfs-tree">{walk(tree)}</div>;
 }

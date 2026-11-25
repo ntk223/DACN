@@ -33,7 +33,7 @@ export function Modal({ open, title, onClose, width = 520, children }: ModalProp
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 23, 42, 0.4)",
+        background: "var(--overlay-bg)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -62,16 +62,20 @@ export function Modal({ open, title, onClose, width = 520, children }: ModalProp
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "14px 20px",
+            gap: "var(--space-3)",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--color-border)",
-            fontWeight: 600,
+            fontWeight: 650,
+            fontSize: "var(--font-size-lg)",
+            color: "var(--color-text)",
           }}
         >
           <div>{title}</div>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="modal-close"
             aria-label="Đóng"
+            title="Đóng (Esc)"
             onClick={onClose}
           >
             ✕

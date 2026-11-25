@@ -1,6 +1,8 @@
 /**
  * base.css — reset, typography, scrollbar, và bộ utility class dùng chung.
  * Quy ước class: kebab-case, modifier là hậu tố (btn-primary, badge-green…).
+ * Nguyên tắc: vùng bấm ≥ 38px (sm ≥ 32px), mọi control có :focus-visible,
+ * contrast tối thiểu — chi tiết xem UX-GUIDE.md.
  */
 
 /* ---- Reset ---- */
@@ -23,7 +25,7 @@ body,
 body {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
-  line-height: 1.5;
+  line-height: var(--line-height-body);
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
@@ -47,8 +49,22 @@ h1,
 h2,
 h3,
 h4 {
-  font-weight: 600;
   line-height: 1.3;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: 700;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: 650;
+}
+
+h3,
+h4 {
+  font-weight: 600;
 }
 
 a {
@@ -64,12 +80,19 @@ code,
 pre,
 .mono {
   font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
+}
+
+/* ---- Focus bàn phím: áp cho MỌI control ---- */
+:where(a, button, input, select, textarea, summary, [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* ---- Scrollbar mảnh ---- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #cdd5de transparent;
+  scrollbar-color: var(--color-scrollbar) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -78,7 +101,7 @@ pre,
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #cdd5de;
+  background: var(--color-scrollbar);
   border-radius: 3px;
 }
 
@@ -95,11 +118,18 @@ pre,
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
   padding: var(--space-5);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .card-title {
   font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-weight: 650;
+  color: var(--color-text);
   margin-bottom: var(--space-3);
 }
 
@@ -109,21 +139,29 @@ pre,
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  height: 34px;
+  min-height: var(--control-height);
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
+  font-size: var(--font-size-base);
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .btn:hover:not(:disabled) {
   background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.btn:active:not(:disabled) {
+  background: var(--color-surface-active);
 }
 
 .btn:disabled {
@@ -133,7 +171,7 @@ pre,
 
 .btn:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .btn-primary {
@@ -145,6 +183,7 @@ pre,
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
+  color: #fff;
 }
 
 .btn-danger {
@@ -154,8 +193,9 @@ pre,
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
+  color: #fff;
 }
 
 .btn-ghost {
@@ -170,9 +210,17 @@ pre,
 }
 
 .btn-sm {
-  height: 28px;
+  min-height: var(--control-height-sm);
   padding: 0 var(--space-3);
   font-size: var(--font-size-sm);
+}
+
+/* Nút chỉ có icon — vuông, ≥ 36px để dễ trúng */
+.btn-icon {
+  min-width: var(--icon-button-size);
+  min-height: var(--icon-button-size);
+  padding: 0;
+  flex-shrink: 0;
 }
 
 /* ---- Input / Select / Textarea ---- */
@@ -180,12 +228,19 @@ pre,
 .select,
 .textarea {
   width: 100%;
-  padding: 7px 10px;
-  border: 1px solid var(--color-border);
+  min-height: var(--control-height);
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
+  font-size: var(--font-size-base);
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--color-text-faint);
 }
 
 .input:focus,
@@ -196,10 +251,18 @@ pre,
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .textarea {
   font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
   resize: vertical;
-  min-height: 80px;
+  min-height: 88px;
 }
 
 /* ---- Badge ---- */
@@ -207,12 +270,13 @@ pre,
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: 600;
   background: var(--color-surface-hover);
   color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .badge-green {
@@ -243,19 +307,33 @@ pre,
 }
 
 .table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   text-align: left;
   font-weight: 600;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  letter-spacing: 0.03em;
+  padding: var(--space-3);
+  background: var(--table-header-bg);
+  border-bottom: 1px solid var(--color-border-strong);
 }
 
 .table td {
   padding: var(--space-3);
   border-bottom: 1px solid var(--color-border);
+}
+
+/* Đảm bảo hàng bảng cao tối thiểu (padding td + line-height ≈ 44px). */
+.table tbody td {
+  min-height: var(--table-row-min-height);
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background 0.1s ease;
 }
 
 .table tbody tr:hover {
@@ -264,6 +342,15 @@ pre,
 
 .table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Zebra tùy chọn — thêm class `table-zebra` khi cần sọc hàng. */
+.table-zebra tbody tr:nth-child(even) {
+  background: var(--table-zebra-bg);
+}
+
+.table-zebra tbody tr:hover {
+  background: var(--color-surface-hover);
 }
 
 /* ---- Spinner ---- */
@@ -295,13 +382,14 @@ pre,
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-6);
+  padding: var(--space-7) var(--space-6);
   color: var(--color-text-muted);
   text-align: center;
 }
 
 .empty-state-title {
   font-weight: 600;
+  font-size: var(--font-size-lg);
   color: var(--color-text);
 }
 
@@ -314,6 +402,30 @@ pre,
   border-radius: 6px;
   background: var(--color-surface);
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-mono);
   color: var(--color-text-muted);
+}
+
+/* ---- Modal (phần mở rộng cho Modal.tsx) ---- */
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--icon-button-size);
+  min-height: var(--icon-button-size);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.modal-close:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }

@@ -13,6 +13,7 @@ import type {
   LogsResult,
   Overview,
   PolicyResult,
+  PullSummary,
   SandboxDetail,
   SessionRow,
   StartResult,
@@ -48,7 +49,10 @@ export const sandboxApi = {
   start: (sessionId: string, body: StartBody) =>
     post<StartResult>(`${BASE}/sessions/${seg(sessionId)}/start`, body),
 
-  stop: (sessionId: string) => post<StateResult>(`${BASE}/sessions/${seg(sessionId)}/stop`),
+  stop: (sessionId: string, force?: boolean) =>
+    post<StateResult>(`${BASE}/sessions/${seg(sessionId)}/stop`, undefined, {
+      query: force ? { force: true } : undefined,
+    }),
 
   pause: (sessionId: string) => post<StateResult>(`${BASE}/sessions/${seg(sessionId)}/pause`),
 
@@ -59,6 +63,8 @@ export const sandboxApi = {
 
   sync: (sessionId: string, full: boolean) =>
     post<SyncResult>(`${BASE}/sessions/${seg(sessionId)}/sync`, { full }),
+
+  pull: (sessionId: string) => post<PullSummary>(`${BASE}/sessions/${seg(sessionId)}/pull`),
 
   compare: (sessionId: string) =>
     get<CompareResult>(`${BASE}/sessions/${seg(sessionId)}/compare`),

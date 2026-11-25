@@ -6,23 +6,22 @@
  * Download: dán download_url từ kết quả tool file_read, hoặc chọn workspace + path.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { EmptyState } from "@/components/EmptyState";
 import { Field } from "@/components/Field";
-import { Spinner } from "@/components/Spinner";
 import { post, putRaw } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 
+import { IconCheckCircle, IconErrorCircle, IconUpload } from "./icons";
+import { OvLoading, OvState } from "./states";
 import type { UploadCompleteResponse, UploadInitResponse } from "./types";
 import { useWorkspaces } from "./useWorkspaces";
 
 export function TransferTab() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+    <div className="ov-sections">
       <UploadCard />
       <DownloadCard />
     </div>
@@ -31,15 +30,24 @@ export function TransferTab() {
 
 /* ------------------------------------------------------------------ upload */
 
+interface UploadProgress {
+  done: number;
+  total: number;
+  /** Số byte đã gửi tính từ các chunk hoàn tất (không vượt quá kích thước file). */
+  sentBytes: number;
+}
+
 function UploadCard() {
   const { workspaces, loading, error, reload } = useWorkspaces();
   const [workspaceId, setWorkspaceId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [targetPath, setTargetPath] = useState("");
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [result, setResult] = useState<UploadCompleteResponse | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Tự chọn workspace đầu tiên khi vừa nạp.
   useEffect(() => {
@@ -82,7 +90,11 @@ function UploadCard() {
         const start = index * chunkSize;
         const slice = file.slice(start, Math.min(start + chunkSize, file.size));
         await putRaw(`${init.upload_url}?chunk=${index}`, slice);
-        setProgress({ done: index + 1, total });
+        setProgress({
+          done: index + 1,
+          total,
+          sentBytes: Math.min((index + 1) * chunkSize, file.size),
+        });
       }
       // Bước 3: ghép + hash + ghi vào VFS/blob.
       const done = await post<UploadCompleteResponse>(`${init.upload_url}/complete`);
@@ -98,9 +110,7 @@ function UploadCard() {
   if (loading) {
     return (
       <Card title="Tải lên workspace">
-        <div className="empty-state">
-          <Spinner />
-        </div>
+        <OvLoading title="Đang tải danh sách workspace…" description="Chọn workspace đích cho file upload." />
       </Card>
     );
   }
@@ -109,17 +119,25 @@ function UploadCard() {
     return (
       <Card title="Tải lên workspace">
         <div className="ov-alert" role="alert">
-          <strong>Không tải được danh sách workspace</strong>
-          <span>{error}</span>
+          <IconErrorCircle />
+          <div className="ov-alert-body">
+            <strong>Không tải được danh sách workspace</strong>
+            <span>{error}</span>
+          </div>
         </div>
       </Card>
     );
   }
 
+  const percent = progress !== null && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+
   return (
     <Card title="Tải lên workspace">
       {workspaces.length === 0 ? (
-        <EmptyState title="Chưa có workspace" description="Hãy tạo workspace ở tab Tổng quan trước khi tải lên." />
+        <OvState
+          title="Chưa có workspace"
+          description="Hãy tạo workspace ở tab Tổng quan trước khi tải lên."
+        />
       ) : (
         <form
           className="ov-form"
@@ -151,16 +169,48 @@ function UploadCard() {
             </select>
           </Field>
 
+          {/* Vùng kéo-thả / chọn file — ẩn input thật, zone là nút bấm ≥ 48px */}
           <Field label="File" hint="Kích thước khai báo trước để server kiểm tra hạn mức.">
             <input
-              className="input"
+              ref={fileInputRef}
               type="file"
+              hidden
               onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
               disabled={busy}
             />
+            <button
+              type="button"
+              className={dragging ? "ov-dropzone is-drag" : "ov-dropzone"}
+              disabled={busy}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const dropped = e.dataTransfer.files[0];
+                if (dropped !== undefined) pickFile(dropped);
+              }}
+            >
+              <IconUpload />
+              <span>
+                <span className="ov-dropzone-title">
+                  {file !== null ? file.name : "Kéo thả file vào đây, hoặc bấm để chọn file"}
+                </span>
+                <span className="ov-dropzone-hint">
+                  {file !== null ? `${formatBytes(file.size)} — bấm để chọn file khác` : "Mọi kích thước — file lớn tự chia phần 4MB"}
+                </span>
+              </span>
+            </button>
           </Field>
 
-          <Field label="Đường đích trong workspace" hint="Ví dụ: data/bao-cao.pdf — tự điền theo tên file nếu bỏ trống.">
+          <Field
+            label="Đường đích trong workspace"
+            hint="Ví dụ: data/bao-cao.pdf — tự điền theo tên file nếu bỏ trống."
+          >
             <input
               className="input mono"
               type="text"
@@ -170,33 +220,40 @@ function UploadCard() {
             />
           </Field>
 
-          {file !== null ? (
-            <div className="ov-form-desc">
-              Đã chọn: <strong>{file.name}</strong> — {formatBytes(file.size)}
-            </div>
-          ) : null}
-
           {progress !== null ? (
-            <div className="ov-progress">
-              <div className="ov-progress-bar" aria-hidden="true">
-                <div style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }} />
+            <div className="ov-progress" role="status">
+              <div className="ov-progress-meta">
+                <span>Đang tải lên…</span>
+                <span>
+                  {percent}% · {formatBytes(progress.sentBytes)} / {file !== null ? formatBytes(file.size) : "—"} (
+                  {progress.done}/{progress.total} phần)
+                </span>
               </div>
-              <span>
-                Đã gửi {progress.done}/{progress.total} phần
-              </span>
+              <div
+                className="ov-progress-bar"
+                role="progressbar"
+                aria-valuenow={percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div style={{ width: `${percent}%` }} />
+              </div>
             </div>
           ) : null}
 
           {uploadError !== null ? (
             <div className="ov-alert" role="alert">
-              <strong>Tải lên thất bại</strong>
-              <span>{uploadError}</span>
+              <IconErrorCircle />
+              <div className="ov-alert-body">
+                <strong>Tải lên thất bại</strong>
+                <span>{uploadError}</span>
+              </div>
             </div>
           ) : null}
 
           {result !== null ? <UploadResult result={result} /> : null}
 
-          <div>
+          <div className="ov-form-footer">
             <Button variant="primary" type="submit" loading={busy}>
               Tải lên theo phần
             </Button>
@@ -207,14 +264,18 @@ function UploadCard() {
   );
 }
 
-/** Kết quả complete: sha256 + nơi lưu + revision. */
+/** Kết quả complete: thông báo thành công (xanh) + sha256 + nơi lưu + revision. */
 function UploadResult({ result }: { result: UploadCompleteResponse }) {
   return (
     <div className="ov-result">
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Badge tone="green">OK</Badge>
-        <span className="ov-form-desc mono">{result.path}</span>
-        <span className="ov-form-desc">{formatBytes(result.size)}</span>
+      <div className="ov-success" role="status">
+        <IconCheckCircle />
+        <div className="ov-alert-body">
+          <strong>Tải lên thành công</strong>
+          <span>
+            {result.path} — {formatBytes(result.size)} · lưu tại {result.storage}
+          </span>
+        </div>
       </div>
       <pre className="ov-pre">
         {`path     : ${result.path}
@@ -292,13 +353,14 @@ function DownloadCard() {
       <Card title="Tải xuống">
         {error !== null ? (
           <div className="ov-alert" role="alert">
-            <strong>Không tải được danh sách workspace</strong>
-            <span>{error}</span>
+            <IconErrorCircle />
+            <div className="ov-alert-body">
+              <strong>Không tải được danh sách workspace</strong>
+              <span>{error}</span>
+            </div>
           </div>
         ) : (
-          <div className="empty-state">
-            <Spinner />
-          </div>
+          <OvLoading title="Đang tải danh sách workspace…" description="Chọn nguồn file để tải về máy." />
         )}
       </Card>
     );
@@ -357,18 +419,24 @@ function DownloadCard() {
 
         {downloadError !== null ? (
           <div className="ov-alert" role="alert">
-            <strong>Tải xuống thất bại</strong>
-            <span>{downloadError}</span>
+            <IconErrorCircle />
+            <div className="ov-alert-body">
+              <strong>Tải xuống thất bại</strong>
+              <span>{downloadError}</span>
+            </div>
           </div>
         ) : null}
 
         {done !== null ? (
-          <div className="ov-form-desc" role="status">
-            {done}
+          <div className="ov-success" role="status">
+            <IconCheckCircle />
+            <div className="ov-alert-body">
+              <span>{done}</span>
+            </div>
           </div>
         ) : null}
 
-        <div>
+        <div className="ov-form-footer">
           <Button variant="primary" type="submit" loading={busy}>
             Tải về máy
           </Button>

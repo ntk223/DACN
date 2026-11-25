@@ -61,8 +61,8 @@ export function LogsPanel({ sandboxId, supported, notify }: LogsPanelProps) {
         </Button>
       }
     >
-      <pre ref={preRef} className="sbx-pre">
-        {logs ?? "Bấm “Tải log” để xem log container."}
+      <pre ref={preRef} className="sbx-pre sbx-dark">
+        {logs ?? <span className="sbx-pre-hint">Bấm “Tải log” để xem log container.</span>}
       </pre>
     </Card>
   );

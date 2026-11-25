@@ -37,6 +37,7 @@ export function PolicyPanel({ notify }: PolicyPanelProps) {
         <input
           className="input sbx-cmdline"
           type="text"
+          aria-label="Lệnh cần kiểm tra qua bộ chặn"
           placeholder="lệnh cần thử qua bộ chặn, vd: rm -rf /"
           spellCheck={false}
           value={command}
