@@ -5,13 +5,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import type { ToastKind } from "@/components/Toast";
 import { sandboxApi } from "./sandboxApi";
 
 interface LogsPanelProps {
   sandboxId: string;
   /** Provider có hỗ trợ log không (capabilities.diagnostics). */
   supported: boolean;
-  notify: (message: string, kind?: "ok" | "err" | "warn") => void;
+  notify: (message: string, kind?: ToastKind) => void;
 }
 
 const TAIL_DEFAULT = 200;
@@ -46,7 +47,7 @@ export function LogsPanel({ sandboxId, supported, notify }: LogsPanelProps) {
       const result = await sandboxApi.logs(sandboxId, TAIL_DEFAULT);
       setLogs(result.available ? (result.logs ?? "(chưa có log)") : "Provider không hỗ trợ log.");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Tải log thất bại", "err");
+      notify(error instanceof Error ? error.message : "Tải log thất bại", "error");
     } finally {
       setLoading(false);
     }
@@ -61,7 +62,7 @@ export function LogsPanel({ sandboxId, supported, notify }: LogsPanelProps) {
         </Button>
       }
     >
-      <pre ref={preRef} className="sbx-pre sbx-dark">
+      <pre ref={preRef} className="mono-pre sbx-dark">
         {logs ?? <span className="sbx-pre-hint">Bấm “Tải log” để xem log container.</span>}
       </pre>
     </Card>

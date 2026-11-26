@@ -15,7 +15,7 @@ interface RenameModalProps {
 
 /**
  * Modal "Đổi tên / di chuyển": input đường dẫn mới + preview đường dẫn đích
- * (thay cho window.prompt cũ — xem trước trước khi ghi).
+ * (thay cho hộp prompt của trình duyệt cũ — xem trước trước khi ghi).
  */
 export function RenameModal({ open, path, busy, onConfirm, onClose }: RenameModalProps) {
   const [dst, setDst] = useState(path);

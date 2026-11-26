@@ -5,22 +5,11 @@ interface FieldProps {
   label: ReactNode;
   /** Hint nhỏ dưới control. */
   hint?: ReactNode;
-  /** Layout ngang: label bên trái, control bên phải (dùng trong toolbar). */
-  horizontal?: boolean;
   children: ReactNode;
 }
 
 /** Bọc label + control (input/select/textarea tuỳ feature tự render vào children). */
-export function Field({ label, hint, horizontal = false, children }: FieldProps) {
-  if (horizontal) {
-    return (
-      <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: "var(--color-text)", fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>{children}</span>
-        {hint !== undefined ? <FieldHint>{hint}</FieldHint> : null}
-      </label>
-    );
-  }
+export function Field({ label, hint, children }: FieldProps) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <span style={{ color: "var(--color-text)", fontWeight: 500, fontSize: "var(--font-size-sm)" }}>{label}</span>

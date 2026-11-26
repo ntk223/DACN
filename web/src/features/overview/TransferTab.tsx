@@ -11,10 +11,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
+import { IconCheckCircle, IconErrorCircle, IconUpload } from "@/components/icons";
 import { post, putRaw } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 
-import { IconCheckCircle, IconErrorCircle, IconUpload } from "./icons";
 import { OvLoading, OvState } from "./states";
 import type { UploadCompleteResponse, UploadInitResponse } from "./types";
 import { useWorkspaces } from "./useWorkspaces";
@@ -230,7 +230,7 @@ function UploadCard() {
                 </span>
               </div>
               <div
-                className="ov-progress-bar"
+                className="meter"
                 role="progressbar"
                 aria-valuenow={percent}
                 aria-valuemin={0}
@@ -277,7 +277,7 @@ function UploadResult({ result }: { result: UploadCompleteResponse }) {
           </span>
         </div>
       </div>
-      <pre className="ov-pre">
+      <pre className="mono-pre">
         {`path     : ${result.path}
 sha256   : ${result.sha256}
 size     : ${result.size} B

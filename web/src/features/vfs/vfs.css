@@ -70,30 +70,7 @@
   color: var(--color-text-muted);
 }
 
-/* ---- Cặp key/value kiểu <dl> ---- */
-.vfs-kv {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
-.vfs-kv-pair {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 2px var(--space-3);
-}
-
-.vfs-kv dt {
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.vfs-kv dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
+/* Cặp key/value kiểu <dl> đã dùng class neutral .kv/.kv-pair của base.css. */
 
 /* ---- Metadata đầy đủ (gập/mở) ---- */
 .vfs-moredetail summary {
@@ -102,18 +79,8 @@
   padding: 2px 0;
 }
 
-/* ---- Thanh hạn mức (6px, mảnh) ---- */
-.vfs-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--color-surface-hover);
-  overflow: hidden;
-}
-
-.vfs-bar > div {
-  height: 100%;
-  transition: width 0.2s ease;
-}
+/* Thanh hạn mức đã dùng class neutral .meter của base.css
+   (fill màu theo % hạn mức set inline — xanh/cam/đỏ). */
 
 /* ---- Danh sách workspace: item ≥ 40px, active = accent-soft + thanh trái ---- */
 .vfs-ws {
@@ -160,7 +127,7 @@
   margin-top: 2px;
 }
 
-.vfs-ws-quota .vfs-bar {
+.vfs-ws-quota .meter {
   flex: 1;
 }
 
@@ -200,7 +167,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 32px;
+  min-height: 38px; /* touch target ≥ 38px */
   padding: 2px 0;
   border-bottom: 1px solid var(--color-border);
   font-size: var(--font-size-sm);
@@ -230,7 +197,7 @@
   flex-shrink: 0;
 }
 
-/* ---- Cây file: item ≥ 32px, icon 18px, badge bên phải, kẻ dọc dẫn hướng ---- */
+/* ---- Cây file: item ≥ 38px (touch target), icon 18px, badge bên phải, kẻ dọc dẫn hướng ---- */
 .vfs-tree {
   max-height: max(320px, calc(100vh - 420px));
   overflow: auto;
@@ -241,7 +208,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
+  min-height: 38px; /* touch target ≥ 38px */
   padding: 0 var(--space-2);
   border-radius: var(--radius-control);
   border: 1px solid transparent;
@@ -522,16 +489,10 @@
   tab-size: 4;
 }
 
-/* ---- Nhị phân: hex dump + ảnh preview ---- */
-.vfs-hex {
-  background: var(--table-header-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  padding: var(--space-2);
-  overflow: auto;
+/* ---- Nhị phân: hex dump dùng .mono-pre của base, chỉ giữ cột hex không wrap ---- */
+.vfs-hexfix {
+  white-space: pre;
   max-height: 320px;
-  margin: 0;
-  font-size: var(--font-size-sm);
 }
 
 .vfs-preview-img {
@@ -560,7 +521,7 @@
 
 /* ---- Dòng revision trong Lịch sử ---- */
 .vfs-rev {
-  min-height: 36px;
+  min-height: 38px; /* touch target ≥ 38px */
   padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -587,37 +548,22 @@
   overflow-x: auto;
 }
 
-/* ---- Toast ---- */
-.vfs-toasts {
-  position: fixed;
-  right: var(--space-4);
-  bottom: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 200;
-  max-width: min(420px, calc(100vw - 32px));
-}
+/* Toast đã dùng class neutral .toast-stack/.toast của base.css. */
 
-.vfs-toast {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-success);
-  border-radius: var(--radius-control);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-overlay);
-  overflow-wrap: anywhere;
-}
+/* ---- Mobile (≤640px): 2 cột xếp dọc, card gọn lại ---- */
+@media (max-width: 640px) {
+  .vfs-layout,
+  .vfs-layout--ops,
+  .vfs-layout--manage {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
 
-.vfs-toast-info {
-  border-left-color: var(--color-accent);
-}
+  .vfs-col {
+    gap: var(--space-3);
+  }
 
-.vfs-toast-warn {
-  border-left-color: var(--color-warning);
-}
-
-.vfs-toast-error {
-  border-left-color: var(--color-danger);
+  .vfs-layout .card {
+    padding: var(--space-3);
+  }
 }

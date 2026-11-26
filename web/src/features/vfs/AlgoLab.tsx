@@ -109,16 +109,16 @@ export function AlgoLab() {
           </div>
         ) : null}
         {pathResult !== null ? (
-          <dl className="vfs-kv" style={{ marginTop: 10 }}>
-            <div className="vfs-kv-pair">
+          <dl className="kv" style={{ marginTop: 10 }}>
+            <div className="kv-pair">
               <dt>canonical</dt>
               <dd className="mono">{pathResult.canonical ?? "—"}</dd>
             </div>
-            <div className="vfs-kv-pair">
+            <div className="kv-pair">
               <dt>đã đổi</dt>
               <dd>{pathResult.canonical !== undefined ? (pathResult.changed ? "có" : "không") : "—"}</dd>
             </div>
-            <div className="vfs-kv-pair">
+            <div className="kv-pair">
               <dt>kết quả</dt>
               <dd style={{ color: pathResult.ok ? "var(--color-success)" : "var(--color-danger)" }}>
                 {pathResult.ok

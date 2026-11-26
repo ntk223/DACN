@@ -4,9 +4,9 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { formatTime } from "@/lib/format";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LineDiffView } from "./LineDiffView";
-import type { ToastKind } from "./Toast";
+import type { ToastKind } from "@/components/Toast";
 import { errorMessage, vfsApi } from "./vfsApi";
 import type { FileDetail, Revision } from "./types";
 
@@ -92,7 +92,10 @@ export function HistoryPanel({ wsId, file, isNew, onToast, onRefresh }: HistoryP
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === "Enter") setSelectedId(rev.id === selectedId ? null : rev.id);
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSelectedId(rev.id === selectedId ? null : rev.id);
+              }
             }}
           >
             <span className="vfs-dim vfs-small">{`#${rev.id}`}</span>

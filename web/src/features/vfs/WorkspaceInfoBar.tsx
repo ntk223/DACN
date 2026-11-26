@@ -1,31 +1,12 @@
 import { Badge } from "@/components/Badge";
-import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { IconTerminal } from "@/components/icons";
+import { StateBadge } from "@/components/StateBadge";
 import { formatBytes } from "@/lib/format";
 import type { OpenSandboxOps } from "@/lib/nav";
-import { quotaTone } from "./WorkspaceList";
+import { quotaColor } from "./WorkspaceList";
 import type { SessionRow, WorkspaceDetail } from "./types";
-
-/** Icon terminal cho nút "Sang Sandbox". */
-function TerminalIcon() {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M7 9l3 3-3 3" />
-      <path d="M12 15h5" />
-    </svg>
-  );
-}
 
 /**
  * Phiên đang gắn với workspace — trạng thái còn thao tác được trên sandbox:
@@ -69,12 +50,10 @@ export function WorkspaceInfoBar({ detail, onOpenSandboxOps }: WorkspaceInfoBarP
           </Badge>
         ) : null}
         {session !== null ? (
-          <Badge
-            tone={session.state === "RUNNING" ? "green" : "yellow"}
-            title={`Phiên sandbox gắn với workspace · ${session.state}`}
-          >
-            {(sessionId ?? "?").slice(0, 8)} · {session.state}
-          </Badge>
+          <StateBadge
+            state={session.state}
+            label={`${(sessionId ?? "?").slice(0, 8)} · ${session.state}`}
+          />
         ) : null}
         <span className="vfs-grow" />
         {canJump && sessionId !== null && onOpenSandboxOps !== undefined ? (
@@ -83,7 +62,7 @@ export function WorkspaceInfoBar({ detail, onOpenSandboxOps }: WorkspaceInfoBarP
             title="Thao tác trên sandbox của workspace này"
             onClick={() => onOpenSandboxOps(sessionId)}
           >
-            <TerminalIcon />
+            <IconTerminal size={16} />
             Sang Sandbox
           </Button>
         ) : session !== null ? null : (
@@ -97,8 +76,8 @@ export function WorkspaceInfoBar({ detail, onOpenSandboxOps }: WorkspaceInfoBarP
           {detail.summary.file_count} file · rev {detail.summary.revision} · {formatBytes(used)}
         </span>
         <div className="vfs-ws-quota vfs-grow" title={`${pct.toFixed(1)}% hạn mức`}>
-          <div className="vfs-bar">
-            <div style={{ width: `${Math.min(100, pct)}%`, background: quotaTone(used, quota) }} />
+          <div className="meter">
+            <div style={{ width: `${Math.min(100, pct)}%`, background: quotaColor(used, quota) }} />
           </div>
           <span className="vfs-ws-pct">{pct.toFixed(0)}%</span>
         </div>

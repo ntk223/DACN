@@ -3,33 +3,14 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { IconClock } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { formatBytes, formatTime, truncPath } from "@/lib/format";
-import type { ToastKind } from "./Toast";
+import type { ToastKind } from "@/components/Toast";
 import { DirtyDiffModal } from "./DirtyDiffModal";
 import { FuzzyEditModal } from "./FuzzyEditModal";
 import { HistoryPanel } from "./HistoryPanel";
 import type { FileDetail } from "./types";
-
-/** Icon đồng hồ cho nút "Lịch sử" (mở lịch sử chỉnh sửa của file ngay tại trang Thao tác). */
-function ClockIcon() {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
 
 interface FileEditorProps {
   wsId: string | null;
@@ -253,7 +234,7 @@ export function FileEditor({
               onClick={() => setHistoryOpen(true)}
               title="Xem lịch sử chỉnh sửa của file này"
             >
-              <ClockIcon />
+              <IconClock size={16} />
               Lịch sử
             </Button>
           ) : null}
@@ -277,6 +258,7 @@ export function FileEditor({
             className="input vfs-grow mono"
             value={newPath}
             placeholder="đường dẫn, vd src/main.py"
+            aria-label="Đường dẫn file mới"
             onChange={(e) => onNewPathChange(e.target.value)}
             autoFocus
           />
@@ -286,9 +268,9 @@ export function FileEditor({
       {file !== null && !isNew ? (
         <details className="vfs-moredetail">
           <summary className="vfs-dim vfs-small">Metadata đầy đủ</summary>
-          <dl className="vfs-kv" style={{ marginTop: 8 }}>
+          <dl className="kv" style={{ marginTop: 8 }}>
             {fileMetaRows(file).map((row) => (
-              <div key={row.key} className="vfs-kv-pair">
+              <div key={row.key} className="kv-pair">
                 <dt>{row.key}</dt>
                 <dd>{row.value}</dd>
               </div>
@@ -327,7 +309,7 @@ export function FileEditor({
                   style={{ marginBottom: 10 }}
                 />
               ) : null}
-              <pre className="vfs-hex">{hexDump(bytes)}</pre>
+              <pre className="mono-pre vfs-hexfix">{hexDump(bytes)}</pre>
             </>
           );
         })()

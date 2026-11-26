@@ -7,11 +7,11 @@
  * Thao tác. Tự làm mới 5 giây với chỉ báo "đang cập nhật…".
  */
 import { Button } from "@/components/Button";
+import { ToastStack, useToasts } from "@/components/Toast";
 import type { OpenSandboxOps } from "@/lib/nav";
 import { useState } from "react";
 import { LoadErrorBanner, LoadErrorCard, useSandboxData } from "./SandboxData";
 import { SandboxTable } from "./SandboxTable";
-import { ToastStack, useToasts } from "./Toast";
 import "./sandbox.css";
 
 export function SandboxManagePage({ onOpenOps }: { onOpenOps?: OpenSandboxOps }) {
@@ -46,10 +46,7 @@ export function SandboxManagePage({ onOpenOps }: { onOpenOps?: OpenSandboxOps })
               đang cập nhật…
             </span>
           ) : null}
-          <label
-            className="sbx-meta"
-            style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }}
-          >
+          <label className="sbx-meta sbx-check">
             <input
               type="checkbox"
               checked={autoRefresh}

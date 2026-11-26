@@ -14,13 +14,14 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Spinner } from "@/components/Spinner";
+import { StateBadge } from "@/components/StateBadge";
+import { IconErrorCircle, IconSearch, IconTrash, IconWarn } from "@/components/icons";
 import { get } from "@/lib/api";
 
 import { callMcpTool, isObject, safeJsonStringify } from "./mcp";
 import type { McpCallOutcome } from "./mcp";
 import { MCP_TOOLS, groupMcpTools } from "./mcpTools";
 import type { McpTool, ToolField } from "./mcpTools";
-import { IconErrorCircle, IconSearch, IconTrash, IconWarn } from "./icons";
 import { OvLoading } from "./states";
 import type { SessionRow, WorkspaceDetailResponse } from "./types";
 import { useWorkspaces } from "./useWorkspaces";
@@ -294,19 +295,14 @@ export function ConsoleTab() {
   );
 }
 
-/** Badge trạng thái phiên đang chọn. */
+/** Badge trạng thái phiên đang chọn — dùng StateBadge dùng chung
+ * (nhãn tiếng Việt + tone + tooltip; state lạ hiển thị mã gốc nền xám). */
 function SessionBadge({ sessionId, sessions }: { sessionId: string; sessions: SessionRow[] }) {
   if (sessionId === "") {
     return <Badge tone="gray">chưa chọn phiên</Badge>;
   }
   const current = sessions.find((s) => s.session_id === sessionId);
-  const state = current?.state ?? "—";
-  const tone = state === "RUNNING" ? "green" : state === "PAUSED" || state === "STARTING" ? "yellow" : "gray";
-  return (
-    <Badge tone={tone} title={current?.sandbox_id ? `sandbox: ${current.sandbox_id}` : undefined}>
-      {state}
-    </Badge>
-  );
+  return <StateBadge state={current?.state ?? "—"} />;
 }
 
 /** Form sinh động theo metadata — key theo tool.name để đổi tool là reset form. */
@@ -462,12 +458,15 @@ function ToolFieldInput({
   if (field.type === "bool") {
     return (
       <Field label={field.label} hint={field.hint}>
-        <input
-          type="checkbox"
-          checked={value === true}
-          onChange={(e) => onChange(e.target.checked)}
-          style={{ width: 16, height: 16 }}
-        />
+        {/* Checkbox 18px trong hàng ≥38px — vùng bấm rộng (Field đã là <label>,
+            bấm vào cả dòng nhãn đều bật/tắt được). */}
+        <div className="ov-check">
+          <input
+            type="checkbox"
+            checked={value === true}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+        </div>
       </Field>
     );
   }
@@ -553,7 +552,7 @@ function ResultPanel({ outcome, onClear }: { outcome: Outcome; onClear: () => vo
             </div>
           </div>
         ) : null}
-        <pre className={outcome.isError ? "ov-pre is-error" : "ov-pre"}>{text}</pre>
+        <pre className={outcome.isError ? "mono-pre is-error" : "mono-pre"}>{text}</pre>
       </div>
     </Card>
   );

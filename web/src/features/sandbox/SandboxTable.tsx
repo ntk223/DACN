@@ -3,20 +3,26 @@
  * Mỗi hàng chỉ hiển thị: phiên/workspace, sandbox_id, trạng thái (badge dot),
  * drift, đồng bộ, TTL còn lại (cảnh báo màu), tạo/hết hạn. Bấm vào hàng nào
  * cũng jump sang trang Thao tác của phiên đó (onOpenOps) — kể cả STANDBY
- * (sang Thao tác để bật). Không còn cột hành động hay modal ở bảng này.
- * Ngoại lệ duy nhất còn nút: sandbox mồ côi (Dọn là việc quản trị hệ thống).
+ * (sang Thao tác để bật). Hàng nhận focus bàn phím (Enter/Space mở).
+ * Ngoại lệ duy nhất còn nút: sandbox mồ côi (Dọn là việc quản trị hệ thống —
+ * xác nhận qua ConfirmDialog dùng chung).
  * Bảng chỉ đọc nên không giữ trạng thái chọn — dữ liệu từ useSandboxData.
  */
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { StateBadge } from "@/components/StateBadge";
+import type { ToastKind } from "@/components/Toast";
+import { providerTone } from "@/lib/format";
 import type { OpenSandboxOps } from "@/lib/nav";
+import { useState } from "react";
 import { sandboxApi } from "./sandboxApi";
 import type { OrphanRow, SessionRow } from "./types";
 import { remainLabel, timeLabel } from "./util";
 
-type Notify = (message: string, kind?: "ok" | "err" | "warn") => void;
+type Notify = (message: string, kind?: ToastKind) => void;
 
 export interface SandboxTableProps {
   sessions: SessionRow[];
@@ -29,40 +35,6 @@ export interface SandboxTableProps {
   /** Gọi lại sau khi dọn mồ côi thành công để tải dữ liệu mới. */
   onChanged: () => void;
   notify: Notify;
-}
-
-/** Badge tone theo trạng thái ghi sổ (DB). */
-function stateTone(state: string): "green" | "yellow" | "gray" {
-  if (state === "RUNNING") return "green";
-  if (state === "PAUSED") return "yellow";
-  return "gray";
-}
-
-/** Badge tone theo trạng thái thật của provider (Docker). */
-export function providerTone(state: string | null | undefined): "green" | "yellow" | "red" {
-  if (state === "running") return "green";
-  if (state === "paused") return "yellow";
-  return "red";
-}
-
-/** Nhãn tiếng Việt + tooltip giải thích cho trạng thái ghi sổ. */
-const STATE_LABELS: Record<string, { label: string; hint: string }> = {
-  STANDBY: { label: "Chờ bật", hint: "Phiên chưa có sandbox — bật ở trang Thao tác." },
-  STARTING: { label: "Đang bật", hint: "Provider đang khởi tạo container, chờ vài giây rồi tải lại." },
-  RUNNING: { label: "Đang chạy", hint: "Sandbox đang chạy — bấm hàng để sang trang Thao tác." },
-  PAUSED: { label: "Tạm dừng", hint: "Container bị pause — bấm hàng để sang trang Thao tác và tiếp tục." },
-};
-
-/** Badge trạng thái có chấm tròn trước chữ (RUNNING xanh / PAUSED vàng / còn lại xám). */
-export function StateBadge({ state }: { state: string }) {
-  const tone = stateTone(state);
-  const meta = STATE_LABELS[state] ?? { label: state, hint: `Trạng thái ghi sổ: ${state}` };
-  return (
-    <Badge tone={tone} title={meta.hint}>
-      <span className={`sbx-dot${state === "RUNNING" ? " sbx-dot-live" : ""}`} aria-hidden="true" />
-      {meta.label}
-    </Badge>
-  );
 }
 
 /** Mức khẩn của TTL: rỗng (bình thường) / warn (<10 phút) / critical (<2 phút). */
@@ -79,17 +51,20 @@ export function SandboxTable({ sessions, orphans, onOpenOps, onChanged, notify }
   const liveCount = sessions.filter(
     (s) => s.state === "RUNNING" || s.state === "PAUSED",
   ).length;
+  /** Mồ côi đang chờ xác nhận dọn (hộp thoại xác nhận dùng chung). */
+  const [orphanTarget, setOrphanTarget] = useState<OrphanRow | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const removeOrphan = async (orphan: OrphanRow) => {
-    if (!window.confirm(`Xóa sandbox ${orphan.sandbox_id} và volume của nó?`)) {
-      return;
-    }
+    setRemoving(true);
     try {
       await sandboxApi.deleteOrphan(orphan.sandbox_id);
       notify(`Đã dọn ${orphan.sandbox_id}`);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Dọn thất bại", "err");
+      notify(error instanceof Error ? error.message : "Dọn thất bại", "error");
     }
+    setRemoving(false);
+    setOrphanTarget(null);
     onChanged();
   };
 
@@ -104,7 +79,7 @@ export function SandboxTable({ sessions, orphans, onOpenOps, onChanged, notify }
             Tạo workspace ở trang Quản lý VFS, rồi bật sandbox từ trang Thao tác.
           </EmptyState>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="sbx-tblwrap">
             <table className="table sbx-table">
               <thead>
                 <tr>
@@ -124,8 +99,17 @@ export function SandboxTable({ sessions, orphans, onOpenOps, onChanged, notify }
                   return (
                     <tr
                       key={row.session_id}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Mở trang Thao tác cho phiên ${row.workspace_name ?? row.workspace_id}`}
                       // Bấm hàng nào cũng jump trang Thao tác — kể cả STANDBY (để bật).
                       onClick={() => onOpenOps?.(row.session_id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onOpenOps?.(row.session_id);
+                        }
+                      }}
                       title="Bấm để xem chi tiết & thao tác"
                     >
                       <td>
@@ -211,7 +195,7 @@ export function SandboxTable({ sessions, orphans, onOpenOps, onChanged, notify }
                     size="sm"
                     variant="ghost"
                     className="sbx-btn-danger-ghost"
-                    onClick={() => void removeOrphan(orphan)}
+                    onClick={() => setOrphanTarget(orphan)}
                   >
                     Dọn sandbox + volume
                   </Button>
@@ -221,6 +205,20 @@ export function SandboxTable({ sessions, orphans, onOpenOps, onChanged, notify }
           </div>
         )}
       </Card>
+
+      {/* Xác nhận dọn mồ côi — sandbox + volume bị xóa vĩnh viễn */}
+      <ConfirmDialog
+        open={orphanTarget !== null}
+        title="Dọn sandbox mồ côi"
+        message={`Xóa sandbox ${orphanTarget?.sandbox_id ?? ""} và volume của nó? Dữ liệu trong sandbox sẽ mất vĩnh viễn (file trong kho VFS không bị ảnh hưởng).`}
+        confirmLabel="Dọn sandbox + volume"
+        danger
+        busy={removing}
+        onConfirm={() => {
+          if (orphanTarget) void removeOrphan(orphanTarget);
+        }}
+        onClose={() => setOrphanTarget(null)}
+      />
     </div>
   );
 }

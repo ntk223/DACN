@@ -133,6 +133,14 @@ pre,
   margin-bottom: var(--space-3);
 }
 
+/* Hàng tiêu đề card: title bên trái, actions bên phải (Card.tsx). */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 /* ---- Button ---- */
 .btn {
   display: inline-flex;
@@ -177,25 +185,25 @@ pre,
 .btn-primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #fff;
+  color: var(--color-text-on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
-  color: #fff;
+  color: var(--color-text-on-accent);
 }
 
 .btn-danger {
   background: var(--color-danger);
   border-color: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-accent);
 }
 
 .btn-danger:hover:not(:disabled) {
   background: var(--color-danger-hover);
   border-color: var(--color-danger-hover);
-  color: #fff;
+  color: var(--color-text-on-accent);
 }
 
 .btn-ghost {
@@ -271,12 +279,22 @@ pre,
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--font-size-sm);
   font-weight: 600;
   background: var(--color-surface-hover);
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+
+/* Chấm tròn trước chữ trong badge trạng thái (màu theo tone badge qua currentColor). */
+.badge-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .badge-green {
@@ -428,4 +446,128 @@ pre,
 .modal-close:hover {
   background: var(--color-surface-hover);
   color: var(--color-text);
+}
+
+/* ===================== Class dùng chung (bản neutral của khối trùng 3 feature) =====================
+ * Các class dưới đây là bản dùng chung cho toast, key-value list, pre mono và thanh tiến trình —
+ * hiện đang bị define trùng trong vfs.css / sandbox.css / overview.css (.vfs-*, .sbx-*, .ov-*).
+ * Feature mới DÙNG class này; feature CSS cũ sẽ được agent đợt 2 dọn dần và chuyển sang.
+ */
+
+/* ---- Toast (thông báo góc phải dưới, từ .sbx-toasts/.vfs-toasts) ---- */
+.toast-stack {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 200;
+  max-width: min(440px, calc(100vw - 32px));
+}
+
+.toast {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-success);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-overlay);
+  overflow-wrap: anywhere;
+}
+
+.toast--success {
+  border-left-color: var(--color-success);
+}
+
+.toast--error {
+  border-left-color: var(--color-danger);
+}
+
+.toast--warn {
+  border-left-color: var(--color-warning);
+}
+
+.toast--info {
+  border-left-color: var(--color-accent);
+}
+
+/* ---- Key-value list (từ .vfs-kv/.sbx-kv) — dùng thẻ <dl> ----
+ * .kv           : danh sách dọc, mỗi mục là .kv-pair (dt + dd)
+ * .kv-pair      : một cặp key/value, dt bên trái max-content
+ * .kv--cols     : biến thể 2 cột cho trang chi tiết (từng mục bọc trong <div>)
+ */
+.kv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.kv-pair {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--space-3);
+}
+
+.kv dt {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kv--cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-5);
+}
+
+.kv--cols > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kv--cols dt {
+  white-space: normal;
+}
+
+/* ---- Pre mono cuộn (từ .ov-pre/.sbx-pre) ---- */
+.mono-pre {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--table-header-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
+  line-height: 1.55;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+/* ---- Thanh tiến trình (từ .vfs-bar/.sbx-meter/.ov-progress-bar) ----
+ * Dùng: <div class="meter"><div style="width: 42%"></div></div>
+ */
+.meter {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-hover);
+  overflow: hidden;
+}
+
+.meter > div {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.2s ease;
 }

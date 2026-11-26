@@ -6,7 +6,7 @@
 
 import { post } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
-import type { ToastKind } from "./Toast";
+import type { ToastKind } from "@/components/Toast";
 import { vfsApi } from "./vfsApi";
 import type { UploadCompleteResult } from "./types";
 

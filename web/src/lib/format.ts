@@ -55,3 +55,19 @@ export function truncPath(path: string, maxLength = 32): string {
   const suffix = path.slice(-Math.floor(maxLength * 0.7));
   return `…${suffix}`;
 }
+
+export type Tone = "default" | "green" | "yellow" | "red" | "gray";
+
+/**
+ * providerTone — tone badge cho trạng thái/tên provider (gộp từ map cục bộ
+ * ở SandboxTable.tsx + SandboxDetail.tsx, bổ sung tên provider docker/fake/unknown).
+ * Chấp nhận cả provider_state ("running"/"paused"/null…) lẫn tên provider
+ * ("docker"/"fake"/"unknown") — trả về tone Badge tương ứng.
+ */
+export function providerTone(provider: string | null | undefined): Tone {
+  const value = (provider ?? "").toLowerCase();
+  if (value === "running" || value === "docker") return "green";
+  if (value === "paused" || value === "fake") return "yellow";
+  if (value === "unknown" || value === "") return "default";
+  return "red";
+}

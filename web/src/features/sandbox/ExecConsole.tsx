@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
+import { IconPlay, IconStop } from "@/components/icons";
+import type { ToastKind } from "@/components/Toast";
 import { execStream } from "./sandboxApi";
 import type { ExecEvent } from "./types";
 
@@ -51,7 +53,7 @@ interface ExecConsoleProps {
   running: boolean;
   /** Báo trang tạm dừng auto-refresh trong lúc lệnh đang chạy. */
   onBusyChange: (busy: boolean) => void;
-  notify: (message: string, kind?: "ok" | "err" | "warn") => void;
+  notify: (message: string, kind?: ToastKind) => void;
 }
 
 /** Xử lý từng event NDJSON → vẽ ra terminal. */
@@ -144,7 +146,7 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
   const execute = async (cmd: string) => {
     if (!cmd || busy) return;
     if (!sessionId || !running) {
-      notify("Sandbox không còn RUNNING — không chạy được lệnh", "err");
+      notify("Sandbox không còn RUNNING — không chạy được lệnh", "error");
       return;
     }
 
@@ -247,6 +249,7 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
         <input
           className="input sbx-cmdline"
           type="text"
+          aria-label="Lệnh shell"
           placeholder="Nhập lệnh, Enter để chạy…"
           autoComplete="off"
           spellCheck={false}
@@ -261,11 +264,11 @@ export function ExecConsole({ sessionId, running, onBusyChange, notify }: ExecCo
           title="Chạy lệnh (Enter)"
           onClick={() => void execute(command.trim())}
         >
-          ▶ Chạy
+          <IconPlay size={16} /> Chạy
         </Button>
         {busy ? (
           <Button variant="danger" title="Hủy lệnh đang chạy (AbortController)" onClick={stopCommand}>
-            ■ Dừng
+            <IconStop size={16} /> Dừng
           </Button>
         ) : null}
         <Button size="sm" onClick={() => setLines([])} disabled={busy} title="Xóa toàn bộ output terminal">

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
-import type { ToastKind } from "./Toast";
+import type { ToastKind } from "@/components/Toast";
 import { errorMessage, vfsApi } from "./vfsApi";
 import { LineDiffView } from "./LineDiffView";
 

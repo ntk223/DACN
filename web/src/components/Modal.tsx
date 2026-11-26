@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 interface ModalProps {
   open: boolean;
@@ -10,15 +10,81 @@ interface ModalProps {
   children: ReactNode;
 }
 
-/** Hộp thoại overlay đơn giản: đóng khi Esc hoặc click nền. */
+/** Selector cho các element có thể focus bên trong hộp thoại. */
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
+/**
+ * Hộp thoại overlay: đóng khi Esc hoặc click nền; focus bị kẹp trong modal (Tab vòng),
+ * khi mở focus vào control đầu tiên, khi đóng trả focus về element trước đó.
+ */
 export function Modal({ open, title, onClose, width = 520, children }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+
+    // Nhớ element đang focus trước khi mở để trả lại khi đóng.
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    /** Danh sách element focus-able hiện có trong hộp thoại. */
+    const focusables = (): HTMLElement[] => {
+      const dialog = dialogRef.current;
+      if (dialog === null) return [];
+      return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (element) => !element.hasAttribute("aria-hidden"),
+      );
     };
+
+    // Mở → focus control đầu tiên (không có thì focus chính hộp thoại).
+    const first = focusables()[0];
+    if (first !== undefined) first.focus();
+    else dialogRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      // Focus trap: Tab / Shift+Tab luôn vòng trong danh sách của modal.
+      const list = focusables();
+      const dialog = dialogRef.current;
+      if (dialog === null) return;
+      if (list.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const firstEl = list[0] as HTMLElement;
+      const lastEl = list[list.length - 1] as HTMLElement;
+      const active = document.activeElement;
+      const inside = active instanceof HTMLElement && dialog.contains(active);
+      if (event.shiftKey) {
+        if (!inside || active === firstEl) {
+          event.preventDefault();
+          lastEl.focus();
+        }
+      } else if (!inside || active === lastEl) {
+        event.preventDefault();
+        firstEl.focus();
+      }
+    };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      // Đóng → trả focus về nơi đã gọi modal.
+      previouslyFocused?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -41,10 +107,12 @@ export function Modal({ open, title, onClose, width = 520, children }: ModalProp
       }}
     >
       <div
+        ref={dialogRef}
         className="modal"
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
+        aria-labelledby={titleId}
+        tabIndex={-1}
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",
@@ -70,7 +138,7 @@ export function Modal({ open, title, onClose, width = 520, children }: ModalProp
             color: "var(--color-text)",
           }}
         >
-          <div>{title}</div>
+          <div id={titleId}>{title}</div>
           <button
             type="button"
             className="modal-close"

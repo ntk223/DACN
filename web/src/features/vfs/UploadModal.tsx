@@ -4,7 +4,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { formatBytes } from "@/lib/format";
-import type { ToastKind } from "./Toast";
+import type { ToastKind } from "@/components/Toast";
 import { errorMessage } from "./vfsApi";
 import { uploadOne } from "./upload";
 
@@ -37,7 +37,7 @@ const STATE_BADGE: Record<UploadState, { tone: "gray" | "default" | "green" | "r
 
 /**
  * Modal upload: nhập thư mục đích (prefill thư mục hiện hành), list file đã chọn
- * với đường dẫn đích sửa được từng file, tiến trình từng file (thay cho window.prompt cũ).
+ * với đường dẫn đích sửa được từng file, tiến trình từng file (thay cho hộp prompt cũ).
  */
 export function UploadModal({
   open,

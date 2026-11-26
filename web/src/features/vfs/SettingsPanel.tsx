@@ -11,9 +11,9 @@ export function SettingsPanel({ settings }: { settings: OverviewSettings }) {
     ["data_dir", settings.data_dir],
   ];
   return (
-    <dl className="vfs-kv">
+    <dl className="kv">
       {rows.map(([key, value]) => (
-        <div key={key} className="vfs-kv-pair">
+        <div key={key} className="kv-pair">
           <dt>{key}</dt>
           <dd>{value}</dd>
         </div>

@@ -12,10 +12,11 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Modal } from "@/components/Modal";
+import { StateBadge } from "@/components/StateBadge";
+import { IconBox, IconClock, IconDatabase, IconErrorCircle, IconFolder, IconPlay } from "@/components/icons";
 import { get, post } from "@/lib/api";
 import { formatBytes, formatTime } from "@/lib/format";
 
-import { IconBox, IconClock, IconDatabase, IconErrorCircle, IconFolder, IconPlay } from "./icons";
 import { OvLoading, OvState } from "./states";
 import type { CreateWorkspaceResponse, OverviewResponse, SandboxOverviewResponse, WorkspaceRow } from "./types";
 
@@ -272,24 +273,8 @@ function StatCard({
   );
 }
 
-/** Badge trạng thái phiên theo state thật: RUNNING xanh / STARTING-PAUSED vàng / còn lại xám. */
-function SessionStateBadge({ state, sessionId }: { state: string | undefined; sessionId: string }) {
-  if (state === undefined) {
-    return (
-      <Badge tone="gray" title={`session: ${sessionId}`}>
-        chưa có phiên
-      </Badge>
-    );
-  }
-  const tone = state === "RUNNING" ? "green" : state === "STARTING" || state === "PAUSED" ? "yellow" : "gray";
-  return (
-    <Badge tone={tone} title={`session: ${sessionId}`}>
-      {state}
-    </Badge>
-  );
-}
-
-/** 1 dòng workspace — badge trạng thái phiên dựa trên state từ /admin/api/sandboxes. */
+/** 1 dòng workspace — badge trạng thái phiên dựa trên state từ /admin/api/sandboxes.
+ * Badge phiên dùng StateBadge dùng chung (nhãn tiếng Việt + tone + tooltip chuẩn). */
 function WorkspaceTr({ ws, sessionStates }: { ws: WorkspaceRow; sessionStates: Map<string, string> }) {
   const state = ws.session_id !== undefined && ws.session_id !== null ? sessionStates.get(ws.session_id) : undefined;
   return (
@@ -300,8 +285,8 @@ function WorkspaceTr({ ws, sessionStates }: { ws: WorkspaceRow; sessionStates: M
       <td>{ws.missing_db ? "—" : (ws.file_count ?? 0)}</td>
       <td>{ws.missing_db ? "—" : formatBytes(ws.used_bytes ?? 0)}</td>
       <td>
-        {ws.session_id ? (
-          <SessionStateBadge state={state} sessionId={ws.session_id} />
+        {ws.session_id && state !== undefined ? (
+          <StateBadge state={state} />
         ) : (
           <Badge tone="gray">chưa có phiên</Badge>
         )}

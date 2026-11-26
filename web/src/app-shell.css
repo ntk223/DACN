@@ -1,0 +1,281 @@
+/**
+ * app-shell.css — style khung app (sidebar + header + main) cho App.tsx.
+ * Chuyển từ inline style sang class để làm responsive bằng media query.
+ * CHỈ dùng biến từ styles/tokens.css, không hardcode màu.
+ * Visual desktop giữ nguyên bản inline cũ; thêm 2 mốc responsive:
+ *   ≤1024px — sidebar hẹp lại 200px.
+ *   ≤640px  — sidebar thành thanh nav ngang cuộn ngang (không cần JS hamburger).
+ */
+
+/* ---- Khung tổng: sidebar trái + cột phải ---- */
+.shell {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---- Sidebar trái cố định ---- */
+.shell-sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-3);
+}
+
+/* Logo "Sandbox Kit" */
+.shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--space-2) var(--space-5);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  color: var(--color-text);
+}
+
+/* Điều hướng: nhóm có nhãn nhỏ uppercase muted phía trên các mục */
+.shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Nhãn nhóm nav — 13px theo guide (cũ 11px, vi phạm tối thiểu ≥13px) */
+.nav-group-label {
+  padding: 0 var(--space-3);
+  padding-top: var(--space-2);
+  padding-bottom: 4px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* Mục nav — 15px (--font-size-base, khớp .btn; cũ 14px ngoài scale token) */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  appearance: none;
+  border: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+/* Hover chỉ áp cho mục chưa active (thay cho onMouseEnter/Leave inline cũ) */
+.nav-item:hover:not(.active) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.nav-item.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border-left-color: var(--color-accent);
+}
+
+/* Footer sidebar: phiên bản gateway */
+.shell-sidebar-footer {
+  margin-top: auto;
+  padding: var(--space-3) var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+}
+
+/* ---- Cột phải: header + nội dung ---- */
+.shell-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell-header {
+  min-height: var(--header-height);
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 10px var(--space-6);
+}
+
+.shell-header-title {
+  min-width: 0;
+}
+
+.shell-title {
+  font-size: var(--font-size-h1);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.shell-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.shell-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* Pill trạng thái gateway: mặc định = mất kết nối (đỏ), .is-ok = hoạt động (xanh) */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.status-pill.is-ok {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+/* Chấm trạng thái — currentColor khớp chữ pill ở cả 2 trạng thái */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Badge môi trường dev */
+.env-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-accent-soft-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shell-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+/* ---- Màn hình vừa: sidebar hẹp lại ---- */
+@media (max-width: 1024px) {
+  .shell-sidebar {
+    width: 200px;
+  }
+}
+
+/* ---- Mobile ≤640px: sidebar thành thanh nav NGANG cuộn ngang ----
+ * Không dùng hamburger JS — toàn bộ nav nằm trên 1 hàng, cuộn ngang được,
+ * nội dung feature chiếm full-width bên dưới. Ổn ở 375px, không tràn ngang. */
+@media (max-width: 640px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .shell-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-2) var(--space-3);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* Brand gọn: 1 dòng, không chiếm chiều dọc */
+  .shell-brand {
+    padding: 0;
+    font-size: var(--font-size-base);
+    flex-shrink: 0;
+  }
+
+  .shell-nav {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Nhóm nav trải ngang; nhãn nhóm ẩn — icon + nhãn mục đủ phân biệt */
+  .nav-group {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .nav-group-label {
+    display: none;
+  }
+
+  /* Mục nav ngang: không xuống dòng, thanh active đổi thành gạch dưới accent */
+  .nav-item {
+    height: 36px;
+    gap: var(--space-2);
+    padding: 0 var(--space-3);
+    border-left: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+  }
+
+  .nav-item.active {
+    box-shadow: inset 0 -2px 0 var(--color-accent);
+  }
+
+  /* Footer version ẩn trên mobile — ưu tiên diện tích cho nav */
+  .shell-sidebar-footer {
+    display: none;
+  }
+
+  /* Header: title + actions wrap trên 1 vùng gọn */
+  .shell-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    min-height: 0;
+  }
+
+  .shell-title {
+    font-size: var(--font-size-h2);
+  }
+
+  .shell-main {
+    padding: var(--space-3);
+  }
+}

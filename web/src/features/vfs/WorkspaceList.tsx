@@ -13,27 +13,8 @@ interface WorkspaceListProps {
   onOpenOps?: OpenVfsOps;
 }
 
-/** Icon bút chì cho nút "Sửa file này" trong tab Lịch sử. */
-export function PencilIcon() {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
-    </svg>
-  );
-}
-
 /** Màu thanh hạn mức: >90% đỏ, >70% cam, còn lại xanh. */
-export function quotaTone(used: number, quota: number): string {
+export function quotaColor(used: number, quota: number): string {
   const pct = quota > 0 ? (used / quota) * 100 : 0;
   if (pct > 90) return "var(--color-danger)";
   if (pct > 70) return "var(--color-warning)";
@@ -89,8 +70,8 @@ function WorkspaceRow({
       </div>
       {item.demonstrates ? <div className="vfs-ws-meta">{item.demonstrates}</div> : null}
       <div className="vfs-ws-quota" title={`${pct.toFixed(1)}% hạn mức`}>
-        <div className="vfs-bar">
-          <div style={{ width: `${Math.min(100, pct)}%`, background: quotaTone(used, quota) }} />
+        <div className="meter">
+          <div style={{ width: `${Math.min(100, pct)}%`, background: quotaColor(used, quota) }} />
         </div>
         <span className="vfs-ws-pct">{pct.toFixed(0)}%</span>
       </div>
@@ -118,6 +99,7 @@ export function WorkspaceList({ overview, activeId, onOpenOps }: WorkspaceListPr
           className="input vfs-grow"
           value={filter}
           placeholder="lọc theo tên / id…"
+          aria-label="Lọc workspace"
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
@@ -125,7 +107,7 @@ export function WorkspaceList({ overview, activeId, onOpenOps }: WorkspaceListPr
         {items.length === 0 ? (
           <div className="vfs-dim vfs-small" style={{ textAlign: "center", padding: "10px 0" }}>
             {overview.workspaces.length > 0
-              ? "Không khớp."
+              ? "Không khớp. Thử từ khóa khác hoặc xóa trắng ô lọc."
               : "Chưa có workspace. Chạy `make seed` hoặc bấm + Workspace ở trang Thao tác."}
           </div>
         ) : (

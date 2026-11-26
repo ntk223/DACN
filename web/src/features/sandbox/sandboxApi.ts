@@ -15,7 +15,6 @@ import type {
   PolicyResult,
   PullSummary,
   SandboxDetail,
-  SessionRow,
   StartResult,
   StateResult,
   SyncResult,
@@ -109,10 +108,4 @@ export async function* execStream(
       yield event;
     }
   }
-}
-
-/** Tìm phiên RUNNING của một sandbox (điều kiện để exec/sync/compare). */
-export function runningSession(overview: Overview | null, sandboxId: string | null): SessionRow | null {
-  if (!overview || !sandboxId) return null;
-  return overview.sessions.find((s) => s.sandbox_id === sandboxId && s.state === "RUNNING") ?? null;
 }

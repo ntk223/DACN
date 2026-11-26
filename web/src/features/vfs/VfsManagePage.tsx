@@ -3,17 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
+import { IconPencil } from "@/components/icons";
 import { Spinner } from "@/components/Spinner";
 import { Tabs } from "@/components/Tabs";
+import { ToastStack, useToasts } from "@/components/Toast";
 import { AlgoLab } from "./AlgoLab";
 import { HistoryPanel } from "./HistoryPanel";
 import { OpsPanel } from "./OpsPanel";
 import { SettingsPanel } from "./SettingsPanel";
-import { ToastStack, useToasts } from "./Toast";
 import { TombsPanel } from "./TombsPanel";
-import { PencilIcon, WorkspaceList } from "./WorkspaceList";
+import { WorkspaceList } from "./WorkspaceList";
 import { WorkspaceMeta } from "./WorkspaceMeta";
 import { errorMessage, vfsApi } from "./vfsApi";
+import { useNavEffect } from "@/lib/nav";
 import type { OpenVfsOps, VfsManageRequest } from "@/lib/nav";
 import type { FileDetail, Overview, WorkspaceDetail } from "./types";
 import "./vfs.css";
@@ -56,8 +58,8 @@ export function VfsManagePage({ onOpenOps, navRequest }: VfsManagePageProps) {
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileVersion, setFileVersion] = useState(0);
-  /** Nonce của navRequest đã áp dụng — null nghĩa là chưa có yêu cầu điều hướng nào. */
-  const lastNavNonceRef = useRef<number | null>(null);
+  /** Đã có yêu cầu điều hướng được áp dụng — chặn auto-select workspace đầu tiên. */
+  const navAppliedRef = useRef(false);
 
   // ---- Lần đầu: tải overview, mặc định chọn workspace đầu tiên ----
   useEffect(() => {
@@ -67,9 +69,9 @@ export function VfsManagePage({ onOpenOps, navRequest }: VfsManagePageProps) {
       .then((data) => {
         if (cancelled) return;
         setOverview(data);
-        // Có yêu cầu điều hướng từ trang Thao tác → effect bên dưới đã chọn
+        // Có yêu cầu điều hướng từ trang Thao tác → useNavEffect bên dưới đã chọn
         // workspace theo yêu cầu, không tự chọn workspace đầu tiên nữa.
-        if (lastNavNonceRef.current !== null) return;
+        if (navAppliedRef.current) return;
         const first = data.workspaces[0];
         if (first !== undefined) setWsId(first.id);
       })
@@ -82,13 +84,12 @@ export function VfsManagePage({ onOpenOps, navRequest }: VfsManagePageProps) {
   }, []);
 
   // ---- Yêu cầu "Thao tác → Quản lý": chọn workspace + tab Lịch sử theo navRequest ----
-  // Chỉ phản ứng khi nonce mới xuất hiện; vào trang qua sidebar thì giữ nguyên lựa chọn.
-  useEffect(() => {
-    if (navRequest === undefined) return;
-    const { nonce, workspaceId, file } = navRequest;
+  // useNavEffect: chỉ chạy khi nonce MỚI hơn lần đã xử lý; vào trang qua sidebar
+  // thì giữ nguyên lựa chọn hiện tại.
+  useNavEffect(navRequest, (req) => {
+    const { workspaceId, file } = req;
     if (workspaceId === undefined && file === undefined) return;
-    if (nonce === lastNavNonceRef.current) return;
-    lastNavNonceRef.current = nonce;
+    navAppliedRef.current = true;
     if (workspaceId !== undefined) {
       setWsId(workspaceId);
       setFileDetail(null);
@@ -102,7 +103,7 @@ export function VfsManagePage({ onOpenOps, navRequest }: VfsManagePageProps) {
       setFileDetail(null);
       setFileError(null);
     }
-  }, [navRequest]);
+  });
 
   // ---- Chi tiết workspace theo dropdown / khi cần refresh ----
   useEffect(() => {
@@ -321,7 +322,7 @@ export function VfsManagePage({ onOpenOps, navRequest }: VfsManagePageProps) {
                           disabled={histPath.trim().length === 0}
                           onClick={() => onOpenOps(wsId, histPath.trim())}
                         >
-                          <PencilIcon />
+                          <IconPencil size={16} />
                           Sửa file này
                         </Button>
                       ) : null}

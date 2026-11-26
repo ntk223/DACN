@@ -40,9 +40,13 @@
   --table-header-bg: #f8fafc;     /* header bảng — nền nhạt, sticky */
   --table-zebra-bg: #fafbfc;      /* sọc hàng chẵn (table-zebra) */
 
+  /* ---- Chữ trên nền đậm (nút primary/danger, badge tone đậm) ---- */
+  --color-text-on-accent: #ffffff;
+
   /* ---- Bo góc ---- */
   --radius-card: 10px;
   --radius-control: 8px;
+  --radius-pill: 999px;           /* badge, thanh tiến trình, pill */
 
   /* ---- Đổ bóng — phân lớp rõ: sm (card tĩnh) → md (hover) → overlay (modal) ---- */
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
@@ -84,4 +88,15 @@
   --space-5: 20px;                /* padding card */
   --space-6: 24px;                /* khoảng cách section */
   --space-7: 32px;
+
+  /* ---- Terminal (khung tối ở sandbox) — hợp nhất từ sandbox.css,
+       các biến --term-* giữ nguyên tên để CSS feature cũ vẫn hoạt động ---- */
+  --term-bg: #0f172a;     /* nền terminal (slate-900) */
+  --term-fg: #e2e8f0;     /* chữ chính (slate-200) */
+  --term-muted: #94a3b8;  /* chữ phụ/meta (slate-400) */
+  --term-err: #fca5a5;    /* stderr / lỗi (red-300) */
+  --term-ok: #4ade80;     /* exit 0 (green-400) */
+  --term-warn: #fbbf24;   /* cảnh báo (amber-400) */
+  --term-accent: #7dd3fc; /* dòng lệnh đã gõ (sky-300) */
+  --term-border: #334155; /* viền + đường kẻ kết quả (slate-700) */
 }

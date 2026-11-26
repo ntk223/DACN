@@ -31,15 +31,15 @@ export function WorkspaceMeta({ detail }: { detail: WorkspaceDetail }) {
 
   return (
     <div>
-      <dl className="vfs-kv">
+      <dl className="kv">
         {rows.map((row) => (
-          <div key={row.key} className="vfs-kv-pair">
+          <div key={row.key} className="kv-pair">
             <dt>{row.key}</dt>
             <dd>{row.value}</dd>
           </div>
         ))}
       </dl>
-      <div className="vfs-bar" style={{ marginTop: 8 }}>
+      <div className="meter" style={{ marginTop: 8 }}>
         <div
           style={{
             width: `${Math.min(100, pct)}%`,

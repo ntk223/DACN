@@ -8,37 +8,18 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { IconArrowDown } from "@/components/icons";
+import type { ToastKind } from "@/components/Toast";
 import { formatBytes } from "@/lib/format";
 import { sandboxApi } from "./sandboxApi";
 import { SyncBadge } from "./SandboxTable";
 import type { CompareResult, PullSummary, SessionRow, SyncResult } from "./types";
 
-/** Icon mũi tên xuống (nhận về kho) cho nút pull. */
-function PullIcon() {
-  return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3v11" />
-      <path d="m7 9 5 5 5-5" />
-      <path d="M4 20h16" />
-    </svg>
-  );
-}
-
 interface SyncPanelProps {
   /** Phiên RUNNING của sandbox đang chọn (sync yêu cầu RUNNING). */
   session: SessionRow | null;
   onChanged: () => void;
-  notify: (message: string, kind?: "ok" | "err" | "warn") => void;
+  notify: (message: string, kind?: ToastKind) => void;
 }
 
 export function SyncPanel({ session, onChanged, notify }: SyncPanelProps) {
@@ -62,7 +43,7 @@ export function SyncPanel({ session, onChanged, notify }: SyncPanelProps) {
           : `Đồng bộ${full ? " toàn bộ" : ""}: đẩy ${result.put ?? 0} file, xóa ${result.deleted ?? 0}`,
       );
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Đồng bộ thất bại", "err");
+      notify(error instanceof Error ? error.message : "Đồng bộ thất bại", "error");
     } finally {
       setSyncing(false);
       onChanged();
@@ -84,7 +65,7 @@ export function SyncPanel({ session, onChanged, notify }: SyncPanelProps) {
           : `Nhận về kho: nhận ${applied} file` +
               (conflicts > 0 ? `, ${conflicts} xung đột` : "") +
               (failures > 0 ? `, ${failures} lỗi` : ""),
-        conflicts > 0 || failures > 0 ? "warn" : "ok",
+        conflicts > 0 || failures > 0 ? "warn" : "success",
       );
       // Làm mới panel: so sánh lại kho ↔ sandbox sau khi đã nhận về.
       try {
@@ -93,7 +74,7 @@ export function SyncPanel({ session, onChanged, notify }: SyncPanelProps) {
         setCompare(null);
       }
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Nhận về kho thất bại", "err");
+      notify(error instanceof Error ? error.message : "Nhận về kho thất bại", "error");
     } finally {
       setPulling(false);
       onChanged();
@@ -106,7 +87,7 @@ export function SyncPanel({ session, onChanged, notify }: SyncPanelProps) {
     try {
       setCompare(await sandboxApi.compare(sessionId));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "So sánh thất bại", "err");
+      notify(error instanceof Error ? error.message : "So sánh thất bại", "error");
       setCompare(null);
     } finally {
       setComparing(false);
@@ -135,7 +116,7 @@ export function SyncPanel({ session, onChanged, notify }: SyncPanelProps) {
           title="Nhận về kho các thay đổi agent tạo trong sandbox (pull-back)"
           onClick={() => void doPull()}
         >
-          <PullIcon />
+          <IconArrowDown size={16} />
           Nhận về kho
         </Button>
         <Button size="sm" disabled={!running} loading={comparing} onClick={() => void doCompare()}>
@@ -168,40 +149,42 @@ function PullResultView({ data }: { data: PullSummary }) {
       </div>
 
       {trouble ? (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Loại</th>
-              <th>File</th>
-            </tr>
-          </thead>
-          <tbody>
-            {conflicts.map((c) => (
-              <tr key={`conflict-${c.path}`}>
-                <td>
-                  <Badge tone="yellow">xung đột {c.kind ?? ""}</Badge>
-                </td>
-                <td>
-                  <span className="sbx-compare-path">{c.path}</span>
-                  <span className="sbx-meta">
-                    {" "}· sandbox {c.sandbox_sha256?.slice(0, 8) ?? "?"} ↔ kho {c.vfs_sha256?.slice(0, 8) ?? "?"}
-                  </span>
-                </td>
+        <div className="sbx-tblwrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Loại</th>
+                <th>File</th>
               </tr>
-            ))}
-            {failures.map((f) => (
-              <tr key={`failure-${f.path}`}>
-                <td>
-                  <Badge tone="red">lỗi nhận</Badge>
-                </td>
-                <td>
-                  <span className="sbx-compare-path">{f.path}</span>
-                  {f.error ? <span className="sbx-meta"> · {f.error}</span> : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {conflicts.map((c) => (
+                <tr key={`conflict-${c.path}`}>
+                  <td>
+                    <Badge tone="yellow">xung đột {c.kind ?? ""}</Badge>
+                  </td>
+                  <td>
+                    <span className="sbx-compare-path">{c.path}</span>
+                    <span className="sbx-meta">
+                      {" "}· sandbox {c.sandbox_sha256?.slice(0, 8) ?? "?"} ↔ kho {c.vfs_sha256?.slice(0, 8) ?? "?"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {failures.map((f) => (
+                <tr key={`failure-${f.path}`}>
+                  <td>
+                    <Badge tone="red">lỗi nhận</Badge>
+                  </td>
+                  <td>
+                    <span className="sbx-compare-path">{f.path}</span>
+                    {f.error ? <span className="sbx-meta"> · {f.error}</span> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </div>
   );
@@ -272,19 +255,21 @@ function CompareTable({ data }: { data: CompareResult }) {
         <Badge tone={data.status === "synced" ? "green" : "yellow"}>{data.status ?? "?"}</Badge>
       </div>
 
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Nhóm</th>
-            <th>File</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((group) => (
-            <FragmentRows key={group.key} group={group} />
-          ))}
-        </tbody>
-      </table>
+      <div className="sbx-tblwrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Nhóm</th>
+              <th>File</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((group) => (
+              <FragmentRows key={group.key} group={group} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

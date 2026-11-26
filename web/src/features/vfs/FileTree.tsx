@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/Badge";
+import { IconFile, IconFolder } from "@/components/icons";
 import { formatBytes } from "@/lib/format";
 import type { VfsFileRow } from "./types";
 
@@ -17,37 +18,6 @@ interface TreeNode {
   path: string;
   dirs: Map<string, TreeNode>;
   files: VfsFileRow[];
-}
-
-/** Icon 18px dùng chung cho cây (SVG stroke theo màu chữ hiện tại). */
-const ICON_PROPS = {
-  className: "vfs-node-icon",
-  width: 18,
-  height: 18,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.8,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-  "aria-hidden": true,
-} as const;
-
-function FolderIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    </svg>
-  );
-}
-
-function FileIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-      <path d="M14 3v5h5" />
-    </svg>
-  );
 }
 
 /** Dựng cây thư mục từ danh sách path phẳng (giữ logic buildTree của trang cũ). */
@@ -127,12 +97,16 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
           onClick={() => toggle(dir.path)}
           role="button"
           tabIndex={0}
+          aria-expanded={open}
           onKeyDown={(e) => {
-            if (e.key === "Enter") toggle(dir.path);
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggle(dir.path);
+            }
           }}
         >
           <span className="vfs-node-twist">{open ? "▾" : "▸"}</span>
-          <FolderIcon />
+          <IconFolder size={18} className="vfs-node-icon" />
           <span className="vfs-node-name">{`${dir.name}/`}</span>
         </div>,
       );
@@ -156,11 +130,14 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onOpen(file.path);
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen(file.path);
+            }
           }}
         >
           <span className="vfs-node-twist" />
-          <FileIcon />
+          <IconFile size={18} className="vfs-node-icon" />
           <span className="vfs-node-name">{file.path.split("/").pop()}</span>
           <FileBadges file={file} />
         </div>,
@@ -172,7 +149,9 @@ export function FileTree({ files, filtered, activePath, onOpen }: FileTreeProps)
   if (filtered.length === 0) {
     return (
       <div className="vfs-dim vfs-small" style={{ textAlign: "center", padding: "12px 0" }}>
-        {files.length > 0 ? "Không khớp." : "Workspace trống."}
+        {files.length > 0
+          ? "Không khớp. Thử từ khóa khác hoặc xóa trắng ô lọc."
+          : "Workspace trống — bấm + File hoặc phím N để tạo file đầu tiên."}
       </div>
     );
   }

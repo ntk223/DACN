@@ -15,7 +15,7 @@ export function Card({ title, actions, className, children, ...rest }: CardProps
   return (
     <div className={classes.join(" ")} {...rest}>
       {title !== undefined || actions !== undefined ? (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div className="card-head">
           {title !== undefined ? <div className="card-title">{title}</div> : <div />}
           {actions}
         </div>

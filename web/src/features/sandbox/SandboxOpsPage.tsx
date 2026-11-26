@@ -1,67 +1,49 @@
 /**
- * SandboxOpsPage.tsx — trang THAO TÁC: nơi tập trung đầy đủ mọi thao tác.
- * Trái (~280px): danh sách phiên — sandbox hoạt động (RUNNING/PAUSED) và cả
- * phiên STANDBY (badge xám "chưa bật") để bật ngay từ đây.
- * Phải:
- *  - Phiên STANDBY → banner vàng "Phiên này chưa bật sandbox" + nút Bật
- *    (modal TTL/CPU/RAM có validation, gọi cùng API start như trang Quản lý cũ).
- *  - Phiên STARTING → banner "đang bật…".
- *  - Phiên có sandbox → thanh hành động ngay dưới tiêu đề sandbox_id:
- *    Tạm dừng / Tiếp tục / Gia hạn (modal hỏi phút) / Dừng & xóa (confirm),
- *    hiển thị theo trạng thái; banner PAUSED gộp vào thanh hành động.
- *    Dưới thanh là tabs Chạy lệnh / File / Log / Đồng bộ / Kiểm tra lệnh /
- *    Thông tin (giữ nguyên).
- * Nhận navRequest từ trang Quản lý: chọn đúng phiên được yêu cầu — kể cả
- * phiên chưa bật sandbox (hiện khối Bật ngay tại đây).
- * Tự làm mới 5 giây — tạm dừng khi lệnh exec đang chạy / người dùng đang gõ /
- * modal Bật·Gia hạn đang mở.
+ * SandboxOpsPage.tsx — trang THAO TÁC sandbox: mọi thao tác vòng đời tập trung tại đây.
+ * Trái: danh sách phiên (kể cả STANDBY/STARTING để bật ngay). Phải: banner theo
+ * trạng thái (Bật qua StartModal / đang bật) + thanh hành động (Tạm dừng /
+ * Tiếp tục / Gia hạn qua RenewModal / Dừng & xóa qua ConfirmDialog) + tabs
+ * Chạy lệnh / File / Log / Đồng bộ / Kiểm tra lệnh / Thông tin.
+ * Nhận navRequest từ trang Quản lý (chọn đúng phiên được yêu cầu). Tự làm mới
+ * 5 giây — tạm dừng khi lệnh exec đang chạy / người dùng đang gõ / modal mở.
  */
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
-import { Field } from "@/components/Field";
-import { Modal } from "@/components/Modal";
 import { Spinner } from "@/components/Spinner";
+import { StateBadge } from "@/components/StateBadge";
 import { Tabs } from "@/components/Tabs";
+import { ToastStack, useToasts } from "@/components/Toast";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "@/lib/api";
+import { providerTone } from "@/lib/format";
 import type { SandboxOpsRequest } from "@/lib/nav";
 import { ExecConsole } from "./ExecConsole";
 import { FileBrowser } from "./FileBrowser";
 import { LoadErrorBanner, LoadErrorCard, useSandboxData } from "./SandboxData";
 import { LogsPanel } from "./LogsPanel";
+import { NotReadyPanel } from "./NotReadyPanel";
 import { PolicyPanel } from "./PolicyPanel";
+import { RenewModal } from "./RenewModal";
 import { SandboxDetail } from "./SandboxDetail";
-import { providerTone, SyncBadge, ttlUrgency } from "./SandboxTable";
+import { SyncBadge, ttlUrgency } from "./SandboxTable";
 import { sandboxApi } from "./sandboxApi";
+import { StartModal } from "./StartModal";
 import { SyncPanel } from "./SyncPanel";
-import { ToastStack, useToasts } from "./Toast";
 import "./sandbox.css";
 import type { ProviderCapabilities, SessionRow, StartResult } from "./types";
-import { limitsLabel, remainLabel } from "./util";
+import { remainLabel } from "./util";
 
 type TabKey = "exec" | "files" | "logs" | "sync" | "policy" | "info";
 
-type Notify = (message: string, kind?: "ok" | "err" | "warn") => void;
-
-/** Badge trạng thái của item cột trái (dot + nhãn ngắn; STANDBY/STARTING xám). */
-function ItemStateBadge({ state }: { state: SessionRow["state"] }) {
-  const meta: Record<SessionRow["state"], { tone: "green" | "yellow" | "gray"; label: string }> = {
-    RUNNING: { tone: "green", label: "Đang chạy" },
-    PAUSED: { tone: "yellow", label: "Tạm dừng" },
-    STARTING: { tone: "gray", label: "đang bật" },
-    STANDBY: { tone: "gray", label: "chưa bật" },
-  };
-  const m = meta[state];
-  return (
-    <Badge tone={m.tone}>
-      <span className={`sbx-dot${state === "RUNNING" ? " sbx-dot-live" : ""}`} aria-hidden="true" />
-      {m.label}
-    </Badge>
-  );
-}
+/** Nhãn ngắn cho badge trạng thái item cột trái (đè nhãn mặc định của StateBadge). */
+const ITEM_STATE_LABEL: Partial<Record<SessionRow["state"], string>> = {
+  STARTING: "đang bật",
+  STANDBY: "chưa bật",
+};
 
 export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -73,7 +55,6 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
     useSandboxData(!autoRefresh || execBusy || modalOpen);
 
   // ---- Điều hướng từ trang Quản lý (navRequest theo nonce) ----
-  /** Phiên được yêu cầu mở — null khi không có yêu cầu hoặc đã xử lý xong. */
   const [navSessionId, setNavSessionId] = useState<string | null>(null);
   const handledNonceRef = useRef<number | null>(null);
 
@@ -86,12 +67,10 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
 
   // Phiên có sandbox (đang hoạt động) ở cột trái.
   const activeSessions =
-    overview?.sessions.filter(
-      (s) => (s.state === "RUNNING" || s.state === "PAUSED") && s.sandbox_id,
-    ) ?? [];
+    overview?.sessions.filter((s) => (s.state === "RUNNING" || s.state === "PAUSED") && s.sandbox_id) ?? [];
 
-  // Xử lý yêu cầu điều hướng khi overview đã tải: chọn phiên — sandbox thì
-  // chọn sandbox_id, STANDBY/STARTING thì chọn theo session_id (khối Bật/xem).
+  // Xử lý yêu cầu điều hướng khi overview đã tải: chọn sandbox_id nếu đã có,
+  // còn STANDBY/STARTING thì chọn theo session_id (khối Bật/xem).
   useEffect(() => {
     if (navSessionId === null || overview === null) return;
     const target = overview.sessions.find((s) => s.session_id === navSessionId) ?? null;
@@ -103,15 +82,13 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
   }, [navSessionId, overview, setSelectedId]);
 
   // ---- Chọn phiên chưa có sandbox (STANDBY/STARTING) — tách khỏi sandbox_id ----
-  /** session_id của phiên STANDBY/STARTING đang chọn ở cột trái. */
   const [notReadySessionId, setNotReadySessionId] = useState<string | null>(null);
   const notReadySession =
     overview?.sessions.find(
       (s) => s.session_id === notReadySessionId && (s.state === "STANDBY" || s.state === "STARTING"),
     ) ?? null;
 
-  // Phiên đang chọn "chưa bật" vừa có sandbox (vừa bật xong) → chuyển sang
-  // chọn sandbox như thường, bỏ trạng thái chưa-bật.
+  // Phiên đang chọn "chưa bật" vừa có sandbox → chuyển sang chọn sandbox như thường.
   useEffect(() => {
     if (notReadySessionId === null) return;
     const row = overview?.sessions.find((s) => s.session_id === notReadySessionId);
@@ -133,8 +110,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
     }
   };
 
-  const session: SessionRow | null =
-    activeSessions.find((s) => s.sandbox_id === selectedId) ?? null;
+  const session = activeSessions.find((s) => s.sandbox_id === selectedId) ?? null;
 
   /** Phiên RUNNING — điều kiện để exec/sync chạy thật (PAUSED → khóa). */
   const runningSession = session !== null && session.state === "RUNNING" ? session : null;
@@ -143,8 +119,10 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
   const [busyAction, setBusyAction] = useState(false);
   const [renewTarget, setRenewTarget] = useState<SessionRow | null>(null);
   const [startTarget, setStartTarget] = useState<SessionRow | null>(null);
-  /** Thông báo khi stop bị gate chống mất dữ liệu chặn (lỗi conflict) — hiện cảnh báo inline. */
+  /** Thông báo khi stop bị gate chống mất dữ liệu chặn (lỗi conflict) — cảnh báo inline. */
   const [stopConflict, setStopConflict] = useState<string | null>(null);
+  // Xác nhận phá hủy qua ConfirmDialog dùng chung: "plain" = dừng & xóa, "force" = bỏ thay đổi.
+  const [confirmStop, setConfirmStop] = useState<null | "plain" | "force">(null);
 
   /**
    * Chạy một thao tác vòng đời (pause/resume/stop) — cờ busy tránh bấm đôi.
@@ -161,16 +139,14 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
       else await sandboxApi.stop(session.session_id, force);
       push(
         action === "stop"
-          ? force
-            ? "Đã dừng (bỏ thay đổi) — sandbox và volume đã xóa"
-            : "Đã dừng — sandbox và volume đã xóa"
+          ? force ? "Đã dừng (bỏ thay đổi) — sandbox và volume đã xóa" : "Đã dừng — sandbox và volume đã xóa"
           : `Phiên → ${action === "pause" ? "tạm dừng" : "chạy lại"}`,
       );
     } catch (err) {
       if (action === "stop" && err instanceof ApiError && err.code === "conflict") {
         setStopConflict(err.message);
       } else {
-        push(err instanceof Error ? err.message : "Thao tác thất bại", "err");
+        push(err instanceof Error ? err.message : "Thao tác thất bại", "error");
       }
     } finally {
       setBusyAction(false);
@@ -190,11 +166,11 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
         </>
       ),
     },
-    { key: "files", label: "File /workspace" as ReactNode },
-    { key: "logs", label: "Log" as ReactNode },
-    { key: "sync", label: "Đồng bộ" as ReactNode },
-    { key: "policy", label: "Kiểm tra lệnh" as ReactNode },
-    { key: "info", label: "Thông tin" as ReactNode },
+    { key: "files", label: "File /workspace" },
+    { key: "logs", label: "Log" },
+    { key: "sync", label: "Đồng bộ" },
+    { key: "policy", label: "Kiểm tra lệnh" },
+    { key: "info", label: "Thông tin" },
   ];
   const [tab, setTab] = useState<TabKey>("exec");
   const activeTab = tabItems.some((item) => item.key === tab) ? tab : "exec";
@@ -265,7 +241,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
                           {row.workspace_name ?? row.workspace_id}
                         </span>
                       )}
-                      <ItemStateBadge state={row.state} />
+                      <StateBadge state={row.state} label={ITEM_STATE_LABEL[row.state]} />
                     </span>
                     <span className="sbx-badges">
                       {row.sandbox_id && row.sync ? <SyncBadge sync={row.sync} /> : null}
@@ -283,10 +259,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
 
           {/* Điều khiển auto-refresh đặt cuối cột trái — không chiếm không gian item */}
           <div className="sbx-toolbar" style={{ marginTop: 12 }}>
-            <label
-              className="sbx-meta"
-              style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }}
-            >
+            <label className="sbx-meta sbx-check">
               <input
                 type="checkbox"
                 checked={autoRefresh}
@@ -302,51 +275,12 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
 
         {/* ---- Cột phải: thao tác trên phiên đã chọn ---- */}
         <div className="sbx-col">
-          {notReadySession !== null && notReadySession.state === "STANDBY" ? (
-            // Phiên chưa bật sandbox — bật ngay tại đây bằng modal TTL/CPU/RAM.
-            <Card
-              title={
-                <span style={{ fontWeight: 600 }}>
-                  {notReadySession.workspace_name ?? notReadySession.workspace_id}
-                </span>
-              }
-              actions={
-                <span className="sbx-meta sbx-mono">
-                  ws {notReadySession.workspace_id} · phiên {notReadySession.session_id.slice(0, 12)}…
-                </span>
-              }
-            >
-              <div className="sbx-banner-warn" role="status" style={{ marginBottom: 12 }}>
-                <span>
-                  <b>Phiên này chưa bật sandbox</b> — bật để chạy lệnh, xem file và đồng bộ.
-                </span>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => {
-                    setStartTarget(notReadySession);
-                    setModalOpen(true);
-                  }}
-                >
-                  Bật sandbox
-                </Button>
-              </div>
-              <EmptyState title="Sandbox chưa khởi tạo">
-                Bấm “Bật sandbox” phía trên, chọn TTL và tài nguyên rồi xác nhận.
-              </EmptyState>
-            </Card>
-          ) : notReadySession !== null && notReadySession.state === "STARTING" ? (
-            // Provider đang khởi tạo container — chỉ chờ.
-            <Card title="Thao tác sandbox">
-              <div className="sbx-banner-warn" role="status" style={{ marginBottom: 12 }}>
-                <span>
-                  <b>Đang bật sandbox…</b> — provider đang khởi tạo container, chờ vài giây rồi tải lại.
-                </span>
-              </div>
-              <EmptyState title="Sandbox đang khởi tạo">
-                Phiên sẽ tự chuyển sang “Đang chạy” sau khi container sẵn sàng.
-              </EmptyState>
-            </Card>
+          {notReadySession !== null ? (
+            // Phiên chưa có sandbox: STANDBY (bật ngay tại đây) / STARTING (đang chờ).
+            <NotReadyPanel
+              session={notReadySession}
+              onStart={(row) => { setStartTarget(row); setModalOpen(true); }}
+            />
           ) : selectedId !== null && session !== null ? (
             <>
               <Card
@@ -362,7 +296,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
                 {/* Thanh hành động phiên — nơi thao tác vòng đời chính */}
                 <div className="sbx-action-bar">
                   <span className="sbx-badges">
-                    <ItemStateBadge state={session.state} />
+                    <StateBadge state={session.state} />
                     <Badge tone={providerTone(session.provider_state)} title="Trạng thái thật theo provider (Docker)">
                       thực tế: {session.provider_state ?? "mất"}
                     </Badge>
@@ -424,15 +358,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
                     className="sbx-btn-danger-ghost"
                     disabled={busyAction}
                     title="Dừng phiên, XÓA sandbox và volume (file trong kho VFS không mất)"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Dừng phiên và XÓA sandbox ${session.sandbox_id} cùng volume? (File trong kho VFS không mất.)`,
-                        )
-                      ) {
-                        void runLifecycle("stop");
-                      }
-                    }}
+                    onClick={() => setConfirmStop("plain")}
                   >
                     Dừng &amp; xóa
                   </Button>
@@ -451,15 +377,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
                         variant="danger"
                         disabled={busyAction}
                         title="Bỏ qua gate chống mất dữ liệu — hủy sandbox và MẤT các thay đổi chưa nhận về"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Dừng và BỎ các thay đổi chưa nhận về kho trong sandbox? Thay đổi chưa nhận sẽ MẤT vĩnh viễn.",
-                            )
-                          ) {
-                            void runLifecycle("stop", true);
-                          }
-                        }}
+                        onClick={() => setConfirmStop("force")}
                       >
                         Dừng &amp; bỏ thay đổi
                       </Button>
@@ -519,17 +437,18 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
 
       {/* Modal Bật sandbox: TTL phút + CPU + RAM (port từ bảng Quản lý cũ) */}
       <StartModal
+        open={modalOpen}
         session={startTarget}
         onClose={() => {
           setStartTarget(null);
           setModalOpen(false);
         }}
-        onDone={(result: StartResult) => {
+        onStarted={(result: StartResult) => {
           setStartTarget(null);
           setModalOpen(false);
           push(`Đã bật ${result.sandbox_id} · nạp ${result.materialized_files ?? 0} file`);
-          // Effect theo notReadySessionId sẽ tự chuyển sang chọn sandbox khi
-          // overview mới về; chọn luôn để phản hồi tức thì.
+          // Effect theo notReadySessionId sẽ tự chuyển chọn khi overview mới về;
+          // chọn luôn để phản hồi tức thì.
           setNotReadySessionId(null);
           setSelectedId(result.sandbox_id);
           reloadAll();
@@ -539,6 +458,7 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
 
       {/* Modal Gia hạn: hỏi số phút */}
       <RenewModal
+        open={modalOpen}
         session={renewTarget}
         onClose={() => {
           setRenewTarget(null);
@@ -553,180 +473,27 @@ export function SandboxOpsPage({ navRequest }: { navRequest?: SandboxOpsRequest 
         notify={push}
       />
 
+      {/* Xác nhận dừng sandbox: "plain" = dừng & xóa; "force" = bỏ thay đổi (mất vĩnh viễn) */}
+      <ConfirmDialog
+        open={confirmStop !== null}
+        title={confirmStop === "force" ? "Dừng & bỏ thay đổi" : "Dừng & xóa sandbox"}
+        message={
+          confirmStop === "force"
+            ? "Dừng và BỎ các thay đổi chưa nhận về kho trong sandbox? Các thay đổi chưa nhận về sẽ MẤT VĨNH VIỄN — không thể khôi phục. Nếu muốn giữ, hãy bấm “Hủy” rồi nhận về kho ở tab Đồng bộ."
+            : `Dừng phiên và XÓA sandbox ${session?.sandbox_id ?? ""} cùng volume của nó? File trong kho VFS không mất, nhưng mọi thay đổi chỉ tồn tại trong sandbox sẽ không nhận về được nữa.`
+        }
+        confirmLabel={confirmStop === "force" ? "Dừng & bỏ thay đổi" : "Dừng & xóa"}
+        danger
+        busy={busyAction}
+        onConfirm={() => {
+          const force = confirmStop === "force";
+          setConfirmStop(null);
+          void runLifecycle("stop", force);
+        }}
+        onClose={() => setConfirmStop(null)}
+      />
+
       <ToastStack toasts={toasts} />
     </div>
-  );
-}
-
-interface StartModalProps {
-  session: SessionRow | null;
-  onClose: () => void;
-  onDone: (result: StartResult) => void;
-  notify: Notify;
-}
-
-/** Modal Bật sandbox — TTL/CPU/RAM + validation inline (port từ SandboxTable). */
-function StartModal({ session, onClose, onDone, notify }: StartModalProps) {
-  const [ttlMinutes, setTtlMinutes] = useState("60");
-  const [cpu, setCpu] = useState("");
-  const [memoryMb, setMemoryMb] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  // Validation inline — chặn gửi khi giá trị không hợp lệ.
-  const ttlNum = Number(ttlMinutes);
-  const ttlInvalid = ttlMinutes.trim() === "" || !Number.isFinite(ttlNum) || ttlNum <= 0;
-  const cpuNum = Number(cpu);
-  const cpuInvalid = cpu.trim() !== "" && (!Number.isFinite(cpuNum) || cpuNum <= 0);
-  const memNum = Number(memoryMb);
-  const memInvalid = memoryMb.trim() !== "" && (!Number.isFinite(memNum) || memNum <= 0);
-  const invalid = ttlInvalid || cpuInvalid || memInvalid;
-
-  const submit = async () => {
-    if (!session || invalid) return;
-    const ttl = Math.max(1, Math.round(ttlNum * 60));
-    setBusy(true);
-    try {
-      const result = await sandboxApi.start(session.session_id, {
-        ttl_seconds: ttl,
-        cpu: cpu.trim() !== "" && Number.isFinite(cpuNum) && cpuNum > 0 ? cpuNum : null,
-        memory: memoryMb.trim() !== "" && Number.isFinite(memNum) && memNum > 0 ? memNum : null,
-      });
-      onDone(result);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Bật sandbox thất bại", "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={session !== null}
-      title={`Bật sandbox — ${session?.workspace_name ?? session?.workspace_id ?? ""}`}
-      onClose={onClose}
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field
-          label="TTL — thời gian sống (phút)"
-          hint="Mặc định 60 phút. Hết hạn sandbox tự dừng sau khoảng này."
-        >
-          <input
-            className={`input${ttlInvalid ? " input-invalid" : ""}`}
-            type="number"
-            min={1}
-            aria-invalid={ttlInvalid}
-            value={ttlMinutes}
-            onChange={(event) => setTtlMinutes(event.target.value)}
-          />
-        </Field>
-        {ttlInvalid ? (
-          <span className="sbx-field-error" style={{ marginTop: -6 }}>TTL phải là số lớn hơn 0.</span>
-        ) : null}
-        <div style={{ display: "flex", gap: 12 }}>
-          <Field label="CPU (core)" hint="Mặc định: không giới hạn.">
-            <input
-              className={`input${cpuInvalid ? " input-invalid" : ""}`}
-              type="number"
-              step="0.5"
-              min="0"
-              placeholder="không giới hạn"
-              aria-invalid={cpuInvalid}
-              value={cpu}
-              onChange={(event) => setCpu(event.target.value)}
-            />
-          </Field>
-          <Field label="RAM (MB)" hint="Mặc định: không giới hạn.">
-            <input
-              className={`input${memInvalid ? " input-invalid" : ""}`}
-              type="number"
-              step="128"
-              min="0"
-              placeholder="không giới hạn"
-              aria-invalid={memInvalid}
-              value={memoryMb}
-              onChange={(event) => setMemoryMb(event.target.value)}
-            />
-          </Field>
-        </div>
-        {cpuInvalid || memInvalid ? (
-          <span className="sbx-field-error">CPU / RAM phải là số lớn hơn 0, hoặc bỏ trống.</span>
-        ) : null}
-        <div className="sbx-toolbar">
-          <span className="sbx-meta">
-            Tổng tài nguyên: {limitsLabel(Number(cpu) || null, Number(memoryMb) || null)}
-          </span>
-          <span className="spacer" />
-          <Button onClick={onClose}>Hủy</Button>
-          <Button variant="primary" loading={busy} disabled={invalid} onClick={() => void submit()}>
-            Bật sandbox
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-interface RenewModalProps {
-  session: SessionRow | null;
-  onClose: () => void;
-  onDone: () => void;
-  notify: Notify;
-}
-
-/** Modal Gia hạn — hỏi số phút cộng vào thời hạn hiện tại (port từ SandboxTable). */
-function RenewModal({ session, onClose, onDone, notify }: RenewModalProps) {
-  const [minutes, setMinutes] = useState("60");
-  const [busy, setBusy] = useState(false);
-
-  const num = Number(minutes);
-  const invalid = minutes.trim() === "" || !Number.isFinite(num) || num <= 0;
-
-  const submit = async () => {
-    if (!session || invalid) return;
-    const ttl = Math.max(1, Math.round(num * 60));
-    setBusy(true);
-    try {
-      await sandboxApi.renew(session.session_id, ttl);
-      onDone();
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Gia hạn thất bại", "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={session !== null}
-      title={`Gia hạn — ${session?.workspace_name ?? session?.workspace_id ?? ""}`}
-      onClose={onClose}
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field
-          label="Số phút gia hạn thêm"
-          hint="Mặc định 60 phút — cộng vào thời hạn hiện tại của phiên."
-        >
-          <input
-            className={`input${invalid ? " input-invalid" : ""}`}
-            type="number"
-            min={1}
-            aria-invalid={invalid}
-            value={minutes}
-            onChange={(event) => setMinutes(event.target.value)}
-          />
-        </Field>
-        {invalid ? (
-          <span className="sbx-field-error" style={{ marginTop: -6 }}>Số phút phải là số lớn hơn 0.</span>
-        ) : null}
-        <div className="sbx-toolbar">
-          <span className="sbx-meta">Hiện tại: {remainLabel(session?.expires_at)}</span>
-          <span className="spacer" />
-          <Button onClick={onClose}>Hủy</Button>
-          <Button variant="primary" loading={busy} disabled={invalid} onClick={() => void submit()}>
-            Gia hạn
-          </Button>
-        </div>
-      </div>
-    </Modal>
   );
 }

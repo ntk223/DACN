@@ -13,7 +13,7 @@ interface ConfirmDialogProps {
   onClose: () => void;
 }
 
-/** Hộp thoại xác nhận dùng chung trong feature VFS (xóa file, khôi phục bản…). */
+/** Hộp thoại xác nhận dùng chung (xóa file, khôi phục bản…). */
 export function ConfirmDialog({
   open,
   title,

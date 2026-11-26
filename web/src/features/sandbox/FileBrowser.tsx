@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
+import type { ToastKind } from "@/components/Toast";
 import { formatBytes } from "@/lib/format";
 import { sandboxApi } from "./sandboxApi";
 import type { FileContent, WorkspaceListing } from "./types";
@@ -14,7 +15,7 @@ interface FileBrowserProps {
   sandboxId: string;
   listing: WorkspaceListing | undefined;
   /** Thay đổi khi danh sách file được tải lại (auto-refresh) — reset lựa chọn nếu file biến mất. */
-  notify: (message: string, kind?: "ok" | "err" | "warn") => void;
+  notify: (message: string, kind?: ToastKind) => void;
 }
 
 export function FileBrowser({ sandboxId, listing, notify }: FileBrowserProps) {
@@ -31,7 +32,10 @@ export function FileBrowser({ sandboxId, listing, notify }: FileBrowserProps) {
   if (!listing) {
     return (
       <Card title="File /workspace">
-        <EmptyState title="Provider không cung cấp danh sách file" />
+        <EmptyState title="Provider không cung cấp danh sách file">
+          Provider sandbox không hỗ trợ liệt kê /workspace (hoặc sandbox chưa sẵn
+          sàng). Hãy bật sandbox và thử lại, hoặc kiểm tra provider đang chạy.
+        </EmptyState>
       </Card>
     );
   }
@@ -54,7 +58,7 @@ export function FileBrowser({ sandboxId, listing, notify }: FileBrowserProps) {
     try {
       setContent(await sandboxApi.readFile(sandboxId, path));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Đọc file thất bại", "err");
+      notify(error instanceof Error ? error.message : "Đọc file thất bại", "error");
       setContent(null);
     } finally {
       setLoading(false);
@@ -96,7 +100,7 @@ export function FileBrowser({ sandboxId, listing, notify }: FileBrowserProps) {
                 {content.encoding === "base64" ? <Badge tone="yellow">nhị phân (base64)</Badge> : null}
                 {loading ? <Badge>đang tải…</Badge> : null}
               </div>
-              <pre className="sbx-pre">{content.content}</pre>
+              <pre className="mono-pre">{content.content}</pre>
             </div>
           ) : null}
         </>

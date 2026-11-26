@@ -132,6 +132,11 @@ export function post<T>(path: string, body?: unknown, options?: RequestOptions):
   return request<T>("POST", path, body, options);
 }
 
+/** PUT với body JSON — chuẩn hóa lỗi giống hệt post (Content-Type application/json). */
+export function putJson<T>(url: string, body: unknown, options?: RequestOptions): Promise<T> {
+  return request<T>("PUT", url, body, options);
+}
+
 export function del<T>(path: string, options?: RequestOptions): Promise<T> {
   return request<T>("DELETE", path, undefined, options);
 }

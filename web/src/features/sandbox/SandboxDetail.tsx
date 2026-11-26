@@ -7,8 +7,7 @@ import { Badge } from "@/components/Badge";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Spinner } from "@/components/Spinner";
-import { formatBytes } from "@/lib/format";
-import type { ReactNode } from "react";
+import { formatBytes, providerTone } from "@/lib/format";
 import type { SandboxDetail as Detail } from "./types";
 import { limitsLabel, remainLabel, timeLabel } from "./util";
 
@@ -16,22 +15,6 @@ interface SandboxDetailProps {
   sandboxId: string | null;
   detail: Detail | null;
   loading: boolean;
-}
-
-function providerTone(state: string | null | undefined): "green" | "yellow" | "red" {
-  if (state === "running") return "green";
-  if (state === "paused") return "yellow";
-  return "red";
-}
-
-/** Một mục key/value trong dl — bọc trong div để xếp 2 cột đều nhau. */
-function Kv({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="sbx-kv-item">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  );
 }
 
 export function SandboxDetail({ sandboxId, detail, loading }: SandboxDetailProps) {
@@ -71,34 +54,56 @@ export function SandboxDetail({ sandboxId, detail, loading }: SandboxDetailProps
             </div>
           ) : null}
 
-          <dl className="sbx-kv">
-            <Kv label="Trạng thái">
-              <Badge tone={providerTone(info.state)}>{info.state ?? "?"}</Badge>
-            </Kv>
-            <Kv label="Phiên">
-              <span className="sbx-mono">{info.session_id ?? "—"}</span>
-            </Kv>
-            <Kv label="Image">
-              <span className="sbx-mono">{info.image ?? "—"}</span>
-            </Kv>
-            <Kv label="Tạo lúc">{timeLabel(info.created_at)}</Kv>
-            <Kv label="Hết hạn">
-              {info.expires_at ? `${timeLabel(info.expires_at)} (${remainLabel(info.expires_at)})` : "không hết hạn"}
-            </Kv>
-            <Kv label="Cổng trình thực thi">
-              <span className="sbx-mono">{info.dial_target ?? "—"}</span>
-            </Kv>
-            <Kv label="Volume /workspace">
-              <span className="sbx-mono">{info.volume ?? "—"}</span>
-            </Kv>
-            <Kv label="Giới hạn">{limitsLabel(info.cpu, info.memory_mb)}</Kv>
-            <Kv label="Mạng">
-              <span className="sbx-mono">{info.network ?? "—"}</span>
-            </Kv>
+          <dl className="kv kv--cols">
+            <div>
+              <dt>Trạng thái</dt>
+              <dd>
+                <Badge tone={providerTone(info.state)}>{info.state ?? "?"}</Badge>
+              </dd>
+            </div>
+            <div>
+              <dt>Phiên</dt>
+              <dd><span className="sbx-mono">{info.session_id ?? "—"}</span></dd>
+            </div>
+            <div>
+              <dt>Image</dt>
+              <dd><span className="sbx-mono">{info.image ?? "—"}</span></dd>
+            </div>
+            <div>
+              <dt>Tạo lúc</dt>
+              <dd>{timeLabel(info.created_at)}</dd>
+            </div>
+            <div>
+              <dt>Hết hạn</dt>
+              <dd>
+                {info.expires_at
+                  ? `${timeLabel(info.expires_at)} (${remainLabel(info.expires_at)})`
+                  : "không hết hạn"}
+              </dd>
+            </div>
+            <div>
+              <dt>Cổng trình thực thi</dt>
+              <dd><span className="sbx-mono">{info.dial_target ?? "—"}</span></dd>
+            </div>
+            <div>
+              <dt>Volume /workspace</dt>
+              <dd><span className="sbx-mono">{info.volume ?? "—"}</span></dd>
+            </div>
+            <div>
+              <dt>Giới hạn</dt>
+              <dd>{limitsLabel(info.cpu, info.memory_mb)}</dd>
+            </div>
+            <div>
+              <dt>Mạng</dt>
+              <dd><span className="sbx-mono">{info.network ?? "—"}</span></dd>
+            </div>
             {info.oom_killed ? (
-              <Kv label="OOM">
-                <Badge tone="red">bị kill vì hết RAM</Badge>
-              </Kv>
+              <div>
+                <dt>OOM</dt>
+                <dd>
+                  <Badge tone="red">bị kill vì hết RAM</Badge>
+                </dd>
+              </div>
             ) : null}
           </dl>
 
@@ -109,7 +114,7 @@ export function SandboxDetail({ sandboxId, detail, loading }: SandboxDetailProps
                 <span>
                   CPU <b>{metrics.cpu_percent ?? 0}%</b>
                 </span>
-                <div className="sbx-meter">
+                <div className="meter">
                   <div style={{ width: `${cpuPercent}%` }} />
                 </div>
               </div>
@@ -117,7 +122,7 @@ export function SandboxDetail({ sandboxId, detail, loading }: SandboxDetailProps
                 <span>
                   RAM <b>{formatBytes(metrics.memory_bytes ?? 0)}</b> / {formatBytes(metrics.memory_limit_bytes ?? 0)}
                 </span>
-                <div className="sbx-meter">
+                <div className="meter">
                   <div style={{ width: `${ramPercent}%` }} />
                 </div>
               </div>

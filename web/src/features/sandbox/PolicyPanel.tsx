@@ -6,11 +6,12 @@ import { useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import type { ToastKind } from "@/components/Toast";
 import { sandboxApi } from "./sandboxApi";
 import type { PolicyResult } from "./types";
 
 interface PolicyPanelProps {
-  notify: (message: string, kind?: "ok" | "err" | "warn") => void;
+  notify: (message: string, kind?: ToastKind) => void;
 }
 
 export function PolicyPanel({ notify }: PolicyPanelProps) {
@@ -25,7 +26,7 @@ export function PolicyPanel({ notify }: PolicyPanelProps) {
     try {
       setResult(await sandboxApi.policy(trimmed));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Kiểm tra thất bại", "err");
+      notify(error instanceof Error ? error.message : "Kiểm tra thất bại", "error");
     } finally {
       setBusy(false);
     }
